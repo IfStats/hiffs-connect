@@ -49,6 +49,7 @@ model Business {
 
   senderRequests SenderRegistration[]
   messages       Message[]
+  apiKeys        ApiKey[]
 
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
@@ -266,4 +267,28 @@ model WalletTransaction {
   @@index([type])
   @@index([status])
   @@index([createdAt])
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id])
+
+  name       String
+  prefix     String
+  keyHash    String    @unique
+  lastFour   String
+
+  enabled    Boolean   @default(true)
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([businessId])
+  @@index([prefix])
+  @@index([enabled])
+  @@index([expiresAt])
 }
