@@ -6,22 +6,24 @@
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
+ 
   "scripts": {
-    "build": "nest build",
-    "deploy": "nest deploy",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "lint": "oxlint src/ test/",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:cov": "vitest run --coverage",
-    "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
-  },
-  "dependencies": {
+  "build": "prisma generate --schema ../../packages/db/prisma/schema.prisma && nest build",
+  "deploy": "nest deploy",
+  "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+  "start": "nest start",
+  "start:dev": "nest start --watch",
+  "start:debug": "nest start --debug --watch",
+  "start:prod": "node dist/main",
+  "lint": "oxlint src/ test/",
+  "test": "vitest run",
+  "test:watch": "vitest",
+  "test:cov": "vitest run --coverage",
+  "test:debug": "vitest --inspect-brk --no-file-parallelism",
+  "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+},
+
+"dependencies": {
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.1",
@@ -36,6 +38,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
+  
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",
     "@nestjs/mau": "^0.2.6",
