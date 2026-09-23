@@ -10,6 +10,7 @@ import { PricingModule } from './pricing/pricing.module.js';
 import { RoutingModule } from './routing/routing.module.js';
 import { WalletsModule } from './wallets/wallets.module.js';
 import { ApiKeysModule } from './api-keys/api-keys.module.js';
+import { AuthModule } from './auth/auth.module.js';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ApiKeysModule } from './api-keys/api-keys.module.js';
     RoutingModule,
     WalletsModule,
     ApiKeysModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
