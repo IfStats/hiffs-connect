@@ -28,7 +28,7 @@ export class MessagingService {
     private readonly routeMobileProvider: RouteMobileProvider,
   ) {}
 
-  async sendSms(dto: SendSmsDto) {
+  async sendSms(dto: SendSmsDto, authenticatedBusinessId: string) {
     const configuredProvider = process.env.MESSAGING_PROVIDER ?? 'mock';
 
     const senderRegistration = await this.prisma.senderRegistration.findUnique({
@@ -39,6 +39,12 @@ export class MessagingService {
 
     if (!senderRegistration) {
       throw new BadRequestException('Sender registration not found');
+    }
+
+    if (senderRegistration.businessId !== authenticatedBusinessId) {
+      throw new BadRequestException(
+        'Sender registration does not belong to the authenticated business',
+      );
     }
 
     if (senderRegistration.status !== 'APPROVED') {

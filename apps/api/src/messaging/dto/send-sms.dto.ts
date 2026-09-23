@@ -10,7 +10,8 @@ export class SendSmsDto {
   @IsString()
   @IsNotEmpty()
   @Matches(/^\+[1-9]\d{7,14}$/, {
-    message: 'to must be a valid international phone number, e.g. +233XXXXXXXXX',
+    message:
+      'to must be a valid international phone number, e.g. +233XXXXXXXXX',
   })
   to!: string;
 

@@ -9,6 +9,7 @@ import { SenderRegistrationsModule } from './sender-registrations/sender-registr
 import { PricingModule } from './pricing/pricing.module.js';
 import { RoutingModule } from './routing/routing.module.js';
 import { WalletsModule } from './wallets/wallets.module.js';
+import { ApiKeysModule } from './api-keys/api-keys.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { WalletsModule } from './wallets/wallets.module.js';
     PricingModule,
     RoutingModule,
     WalletsModule,
+    ApiKeysModule,
   ],
   controllers: [AppController],
   providers: [AppService],
