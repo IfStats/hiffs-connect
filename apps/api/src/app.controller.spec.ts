@@ -1,22 +1,74 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import {
+  Test,
+  TestingModule,
+} from '@nestjs/testing';
+
+import {
+  AppController,
+} from './app.controller.js';
 
 describe('AppController', () => {
-  let appController: AppController;
+  let appController:
+    AppController;
 
   beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
-      controllers: [AppController],
-      providers: [AppService],
-    }).compile();
+    const app:
+      TestingModule =
+      await Test
+        .createTestingModule({
+          controllers: [
+            AppController,
+          ],
+        })
+        .compile();
 
-    appController = app.get<AppController>(AppController);
+    appController =
+      app.get<AppController>(
+        AppController,
+      );
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
-    });
+    it(
+      'should return API metadata',
+      () => {
+        expect(
+          appController.getRoot(),
+        ).toEqual({
+          name:
+            'Hiffs Connect API',
+          status: 'online',
+          version: '0.1.0',
+        });
+      },
+    );
+  });
+
+  describe('health', () => {
+    it(
+      'should return healthy service status',
+      () => {
+        const result =
+          appController.getHealth();
+
+        expect(
+          result.status,
+        ).toBe('ok');
+
+        expect(
+          result.service,
+        ).toBe(
+          'hiffs-connect-api',
+        );
+
+        expect(
+          Number.isNaN(
+            Date.parse(
+              result.timestamp,
+            ),
+          ),
+        ).toBe(false);
+      },
+    );
   });
 });
