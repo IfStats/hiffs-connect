@@ -39,54 +39,55 @@ enum PricingStatus {
 }
 
 model Business {
-  id             String               @id @default(cuid())
-  name           String
-  countryCode    String
-  website        String?
-  email          String?
-  phone          String?
-  wallet         Wallet?
+  id          String  @id @default(cuid())
+  name        String
+  countryCode String
+  website     String?
+  email       String?
+  phone       String?
+  wallet      Wallet?
 
-  senderRequests SenderRegistration[]
-  messages       Message[]
-  apiKeys        ApiKey[]
+  senderRequests   SenderRegistration[]
+  messages         Message[]
+  apiKeys          ApiKey[]
+  senderIdentities SenderIdentity[]
 
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([countryCode])
   @@index([name])
 }
 
 model SenderRegistration {
-  id                     String         @id @default(cuid())
-  businessId             String
-  business               Business       @relation(fields: [businessId], references: [id])
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
 
-  channel                MessageChannel
-  senderType             SenderType
-  senderValue            String
+  channel     MessageChannel
+  senderType  SenderType
+  senderValue String
 
-  countryCode            String
-  destinationCountry     String?
+  countryCode        String
+  destinationCountry String?
 
-  provider               String         @default("infobip")
-  providerReference      String?
+  provider          String  @default("infobip")
+  providerReference String?
 
-  status                 SenderStatus   @default(DRAFT)
+  status SenderStatus @default(DRAFT)
 
   useCase                String?
   estimatedMonthlyVolume Int?
   rejectionReason        String?
 
-  submittedAt            DateTime?
-  approvedAt             DateTime?
-  rejectedAt             DateTime?
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  rejectedAt  DateTime?
 
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  messages               Message[]
+  messages Message[]
 
   @@index([businessId])
   @@index([countryCode])
@@ -95,28 +96,28 @@ model SenderRegistration {
 }
 
 model CountryPricing {
-  id            String         @id @default(cuid())
+  id String @id @default(cuid())
 
-  countryCode   String
-  countryName   String
-  channel       MessageChannel
-  network       String?
+  countryCode String
+  countryName String
+  channel     MessageChannel
+  network     String?
 
-  provider      String         @default("infobip")
+  provider String @default("infobip")
 
-  providerCost  Decimal        @db.Decimal(12, 6)
-  retailPrice   Decimal        @db.Decimal(12, 6)
-  currency      String         @db.VarChar(3)
+  providerCost Decimal @db.Decimal(12, 6)
+  retailPrice  Decimal @db.Decimal(12, 6)
+  currency     String  @db.VarChar(3)
 
-  minVolume     Int?
-  maxVolume     Int?
+  minVolume Int?
+  maxVolume Int?
 
-  status        PricingStatus  @default(ACTIVE)
-  effectiveFrom DateTime       @default(now())
+  status        PricingStatus @default(ACTIVE)
+  effectiveFrom DateTime      @default(now())
   effectiveTo   DateTime?
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([countryCode])
   @@index([channel])
@@ -125,40 +126,40 @@ model CountryPricing {
 }
 
 model Message {
-  id                   String               @id @default(cuid())
+  id String @id @default(cuid())
 
-  businessId           String?
-  business             Business?            @relation(fields: [businessId], references: [id])
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id])
 
   senderRegistrationId String?
-  senderRegistration   SenderRegistration?  @relation(fields: [senderRegistrationId], references: [id])
+  senderRegistration   SenderRegistration? @relation(fields: [senderRegistrationId], references: [id])
 
-  channel              MessageChannel
-  provider             String
-  providerMessageId    String?
+  channel           MessageChannel
+  provider          String
+  providerMessageId String?
 
-  sender               String?
-  recipient            String
+  sender    String?
+  recipient String
 
-  countryCode           String?
-  destinationCountry    String?
-  network               String?
-  routingAttempts       MessageRoutingAttempt[]
-  walletTransactions    WalletTransaction[]
-  content               String
-  status                MessageStatus        @default(QUEUED)
+  countryCode        String?
+  destinationCountry String?
+  network            String?
+  routingAttempts    MessageRoutingAttempt[]
+  walletTransactions WalletTransaction[]
+  content            String
+  status             MessageStatus           @default(QUEUED)
 
-  providerCost          Decimal?             @db.Decimal(12, 6)
-  customerPrice         Decimal?             @db.Decimal(12, 6)
-  currency              String?              @db.VarChar(3)
+  providerCost  Decimal? @db.Decimal(12, 6)
+  customerPrice Decimal? @db.Decimal(12, 6)
+  currency      String?  @db.VarChar(3)
 
-  providerResponse      Json?
-  failureReason         String?
+  providerResponse Json?
+  failureReason    String?
 
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  sentAt                DateTime?
-  deliveredAt           DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sentAt      DateTime?
+  deliveredAt DateTime?
 
   @@index([businessId])
   @@index([senderRegistrationId])
@@ -178,8 +179,8 @@ model ProviderRoutingRule {
   priority    Int            @default(100)
   enabled     Boolean        @default(true)
 
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([countryCode])
   @@index([channel])
@@ -189,22 +190,22 @@ model ProviderRoutingRule {
 }
 
 model MessageRoutingAttempt {
-  id            String   @id @default(cuid())
-  messageId     String
-  message       Message  @relation(fields: [messageId], references: [id])
+  id        String  @id @default(cuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id])
 
   routingRuleId String?
   provider      String
 
   priority      Int?
-  attemptNumber Int      @default(1)
+  attemptNumber Int  @default(1)
 
-  outcome       String
-  retryable     Boolean?
-  errorCode     String?
-  errorMessage  String?
+  outcome      String
+  retryable    Boolean?
+  errorCode    String?
+  errorMessage String?
 
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([messageId])
   @@index([provider])
@@ -227,40 +228,40 @@ enum WalletTransactionStatus {
 }
 
 model Wallet {
-  id         String              @id @default(cuid())
-  businessId String              @unique
-  business   Business            @relation(fields: [businessId], references: [id])
+  id         String   @id @default(cuid())
+  businessId String   @unique
+  business   Business @relation(fields: [businessId], references: [id])
 
-  currency   String              @db.VarChar(3)
-  balance    Decimal             @default(0) @db.Decimal(18, 6)
+  currency String  @db.VarChar(3)
+  balance  Decimal @default(0) @db.Decimal(18, 6)
 
   transactions WalletTransaction[]
 
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model WalletTransaction {
-  id            String                  @id @default(cuid())
-  walletId      String
-  wallet        Wallet                  @relation(fields: [walletId], references: [id])
+  id       String @id @default(cuid())
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id])
 
-  messageId     String?
-  message       Message?                @relation(fields: [messageId], references: [id])
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id])
 
-  type          WalletTransactionType
-  status        WalletTransactionStatus @default(COMPLETED)
+  type   WalletTransactionType
+  status WalletTransactionStatus @default(COMPLETED)
 
-  amount        Decimal                 @db.Decimal(18, 6)
-  currency      String                  @db.VarChar(3)
+  amount   Decimal @db.Decimal(18, 6)
+  currency String  @db.VarChar(3)
 
-  balanceBefore Decimal                 @db.Decimal(18, 6)
-  balanceAfter  Decimal                 @db.Decimal(18, 6)
+  balanceBefore Decimal @db.Decimal(18, 6)
+  balanceAfter  Decimal @db.Decimal(18, 6)
 
-  reference     String?
-  description   String?
+  reference   String?
+  description String?
 
-  createdAt     DateTime                @default(now())
+  createdAt DateTime @default(now())
 
   @@index([walletId])
   @@index([messageId])
@@ -270,25 +271,101 @@ model WalletTransaction {
 }
 
 model ApiKey {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
   businessId String
-  business   Business  @relation(fields: [businessId], references: [id])
+  business   Business @relation(fields: [businessId], references: [id])
 
-  name       String
-  prefix     String
-  keyHash    String    @unique
-  lastFour   String
+  name     String
+  prefix   String
+  keyHash  String @unique
+  lastFour String
 
   enabled    Boolean   @default(true)
   expiresAt  DateTime?
   lastUsedAt DateTime?
   revokedAt  DateTime?
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId])
   @@index([prefix])
   @@index([enabled])
   @@index([expiresAt])
+}
+
+model Provider {
+  id                  String                       @id @default(cuid())
+  code                String                       @unique
+  name                String
+  enabled             Boolean                      @default(true)
+  senderRegistrations ProviderSenderRegistration[]
+
+  supportsSms      Boolean @default(false)
+  supportsWhatsApp Boolean @default(false)
+  supportsVoice    Boolean @default(false)
+  supportsEmail    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+}
+
+model SenderIdentity {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+
+  channel     MessageChannel
+  senderType  SenderType
+  senderValue String
+  countryCode String
+
+  status SenderStatus @default(DRAFT)
+
+  useCase                String?
+  estimatedMonthlyVolume Int?
+
+  providerRegistrations ProviderSenderRegistration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([businessId, channel, senderValue, countryCode])
+  @@index([businessId])
+  @@index([countryCode])
+  @@index([channel])
+  @@index([status])
+}
+
+model ProviderSenderRegistration {
+  id String @id @default(cuid())
+
+  senderIdentityId String
+  senderIdentity   SenderIdentity @relation(fields: [senderIdentityId], references: [id])
+
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id])
+
+  providerReference String?
+  providerSenderId  String?
+
+  status SenderStatus @default(DRAFT)
+
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([senderIdentityId, providerId])
+  @@index([senderIdentityId])
+  @@index([providerId])
+  @@index([status])
+  @@index([providerReference])
 }
