@@ -38,6 +38,23 @@ enum PricingStatus {
   INACTIVE
 }
 
+enum BusinessRole {
+  OWNER
+  ADMIN
+  DEVELOPER
+  BILLING
+  OPERATOR
+  VIEWER
+}
+
+enum PlatformRole {
+  SUPER_ADMIN
+  OPERATIONS
+  SUPPORT
+  FINANCE
+  COMPLIANCE
+}
+
 model Business {
   id          String  @id @default(cuid())
   name        String
@@ -51,6 +68,7 @@ model Business {
   messages         Message[]
   apiKeys          ApiKey[]
   senderIdentities SenderIdentity[]
+  memberships      BusinessMembership[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -368,4 +386,45 @@ model ProviderSenderRegistration {
   @@index([providerId])
   @@index([status])
   @@index([providerReference])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+
+  platformRole PlatformRole?
+
+  memberships BusinessMembership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([platformRole])
+}
+
+model BusinessMembership {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  role   BusinessRole @default(VIEWER)
+  active Boolean      @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, businessId])
+  @@index([userId])
+  @@index([businessId])
+  @@index([role])
+  @@index([active])
 }
