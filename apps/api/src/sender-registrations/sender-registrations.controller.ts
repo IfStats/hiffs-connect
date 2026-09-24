@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { SenderRegistrationsService } from './sender-registrations.service.js';
 import { CreateSenderRegistrationDto } from './dto/create-sender-registration.dto.js';
 import { UpdateSenderStatusDto } from './dto/update-sender-status.dto.js';
@@ -32,11 +25,7 @@ export class SenderRegistrationsController {
   }
 
   @Patch(':id/status')
-  updateStatus(
-    @Param('id') id: string,
-    @Body() dto: UpdateSenderStatusDto,
-  ) {
-    return this.senderRegistrationsService.updateStatus(
-      id, dto);
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateSenderStatusDto) {
+    return this.senderRegistrationsService.updateStatus(id, dto);
   }
 }

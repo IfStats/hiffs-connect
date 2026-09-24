@@ -1,9 +1,4 @@
-import {
-  IsNumber,
-  IsOptional,
-  IsString,
-  NotEquals,
-} from 'class-validator';
+import { IsNumber, IsOptional, IsString, NotEquals } from 'class-validator';
 
 export class AdjustWalletDto {
   @IsNumber()

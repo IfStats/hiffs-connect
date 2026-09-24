@@ -45,9 +45,7 @@ export class AdminController {
 
   @Get('businesses/:businessId/wallet/transactions')
   @RequirePermissions(Permission.WALLET_TRANSACTION_READ)
-  getWalletTransactions(
-    @Param('businessId') businessId: string,
-  ) {
+  getWalletTransactions(@Param('businessId') businessId: string) {
     return this.adminService.getWalletTransactions(businessId);
   }
 
@@ -58,11 +56,7 @@ export class AdminController {
     @Body() dto: WalletOperationDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.adminService.creditWallet(
-      businessId,
-      request.user.id,
-      dto,
-    );
+    return this.adminService.creditWallet(businessId, request.user.id, dto);
   }
 
   @Post('businesses/:businessId/wallet/debit')
@@ -72,11 +66,7 @@ export class AdminController {
     @Body() dto: WalletOperationDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.adminService.debitWallet(
-      businessId,
-      request.user.id,
-      dto,
-    );
+    return this.adminService.debitWallet(businessId, request.user.id, dto);
   }
 
   @Post('businesses/:businessId/wallet/refund')
@@ -86,62 +76,47 @@ export class AdminController {
     @Body() dto: WalletOperationDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.adminService.refundWallet(
-      businessId,
-      request.user.id,
-      dto,
-    );
+    return this.adminService.refundWallet(businessId, request.user.id, dto);
   }
 
   @Get('users')
-@RequirePermissions(Permission.USER_READ)
-listUsers() {
-  return this.adminService.listUsers();
-}
+  @RequirePermissions(Permission.USER_READ)
+  listUsers() {
+    return this.adminService.listUsers();
+  }
 
-@Get('users/:id')
-@RequirePermissions(Permission.USER_READ)
-getUser(@Param('id') id: string) {
-  return this.adminService.getUser(id);
-}
+  @Get('users/:id')
+  @RequirePermissions(Permission.USER_READ)
+  getUser(@Param('id') id: string) {
+    return this.adminService.getUser(id);
+  }
 
-@Patch('users/:id/status')
-@RequirePermissions(Permission.USER_MANAGE)
-updateUserStatus(
-  @Param('id') id: string,
-  @Body() dto: UpdateAccountStatusDto,
-  @Req() request: AuthenticatedRequest,
-) {
-  return this.adminService.updateUserStatus(
-    id,
-    request.user.id,
-    dto,
-  );
-}
+  @Patch('users/:id/status')
+  @RequirePermissions(Permission.USER_MANAGE)
+  updateUserStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateAccountStatusDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.adminService.updateUserStatus(id, request.user.id, dto);
+  }
 
-@Patch('businesses/:id/status')
-@RequirePermissions(Permission.BUSINESS_SUSPEND)
-updateBusinessStatus(
-  @Param('id') id: string,
-  @Body() dto: UpdateAccountStatusDto,
-) {
-  return this.adminService.updateBusinessStatus(
-    id,
-    dto,
-  );
-}
+  @Patch('businesses/:id/status')
+  @RequirePermissions(Permission.BUSINESS_SUSPEND)
+  updateBusinessStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateAccountStatusDto,
+  ) {
+    return this.adminService.updateBusinessStatus(id, dto);
+  }
 
-@Patch('users/:id/platform-role')
-@RequirePermissions(Permission.PLATFORM_ROLE_MANAGE)
-updatePlatformRole(
-  @Param('id') id: string,
-  @Body() dto: UpdatePlatformRoleDto,
-  @Req() request: AuthenticatedRequest,
-) {
-  return this.adminService.updatePlatformRole(
-    id,
-    request.user.id,
-    dto,
-  );
-}
+  @Patch('users/:id/platform-role')
+  @RequirePermissions(Permission.PLATFORM_ROLE_MANAGE)
+  updatePlatformRole(
+    @Param('id') id: string,
+    @Body() dto: UpdatePlatformRoleDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.adminService.updatePlatformRole(id, request.user.id, dto);
+  }
 }

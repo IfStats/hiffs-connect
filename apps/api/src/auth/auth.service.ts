@@ -5,15 +5,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 
-import {
-  createHash,
-} from 'node:crypto';
+import { createHash } from 'node:crypto';
 
-import {
-  InvitationStatus,
-} from '@prisma/client';
+import { InvitationStatus } from '@prisma/client';
 
-import { AcceptInvitationDto } from './dto/accept-invitation.dto.js';;
+import { AcceptInvitationDto } from './dto/accept-invitation.dto.js';
 
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
@@ -42,12 +38,12 @@ export class AuthService {
       include: {
         memberships: {
           where: {
-  active: true,
+            active: true,
 
-  business: {
-    status: 'ACTIVE',
-  },
-},
+            business: {
+              status: 'ACTIVE',
+            },
+          },
 
           include: {
             business: true,
@@ -61,8 +57,8 @@ export class AuthService {
     }
 
     if (user.status !== 'ACTIVE') {
-  throw new UnauthorizedException('Account access is unavailable');
-}
+      throw new UnauthorizedException('Account access is unavailable');
+    }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
 
@@ -99,56 +95,51 @@ export class AuthService {
   }
 
   async signup(dto: SignupDto) {
-  const email = dto.email.trim().toLowerCase();
-  const countryCode = dto.countryCode.trim().toUpperCase();
-  const businessName = dto.businessName.trim();
+    const email = dto.email.trim().toLowerCase();
+    const countryCode = dto.countryCode.trim().toUpperCase();
+    const businessName = dto.businessName.trim();
 
-  const existingUser = await this.prisma.user.findUnique({
-    where: {
-      email,
-    },
-  });
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
 
-  if (existingUser) {
-    throw new ConflictException(
-      'An account already exists with this email',
-    );
-  }
+    if (existingUser) {
+      throw new ConflictException('An account already exists with this email');
+    }
 
-  const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
 
-  const result = await this.prisma.$transaction(
-    async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email,
-          name: dto.name.trim(),
-          passwordHash,
-        },
-      });
-
-      const business = await tx.business.create({
-        data: {
-          name: businessName,
-          countryCode,
-          website: dto.website?.trim() || null,
-          email:
-            dto.businessEmail?.trim().toLowerCase() ||
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const user = await tx.user.create({
+          data: {
             email,
-          phone: dto.phone?.trim() || null,
-        },
-      });
+            name: dto.name.trim(),
+            passwordHash,
+          },
+        });
 
-      const wallet = await tx.wallet.create({
-        data: {
-          businessId: business.id,
-          currency: 'USD',
-          balance: new Prisma.Decimal(0),
-        },
-      });
+        const business = await tx.business.create({
+          data: {
+            name: businessName,
+            countryCode,
+            website: dto.website?.trim() || null,
+            email: dto.businessEmail?.trim().toLowerCase() || email,
+            phone: dto.phone?.trim() || null,
+          },
+        });
 
-      const membership =
-        await tx.businessMembership.create({
+        const wallet = await tx.wallet.create({
+          data: {
+            businessId: business.id,
+            currency: 'USD',
+            balance: new Prisma.Decimal(0),
+          },
+        });
+
+        const membership = await tx.businessMembership.create({
           data: {
             userId: user.id,
             businessId: business.id,
@@ -157,70 +148,63 @@ export class AuthService {
           },
         });
 
-      return {
-        user,
-        business,
-        wallet,
-        membership,
-      };
-    },
-    {
-      maxWait: 10000,
-      timeout: 20000,
-    },
-  );
+        return {
+          user,
+          business,
+          wallet,
+          membership,
+        };
+      },
+      {
+        maxWait: 10000,
+        timeout: 20000,
+      },
+    );
 
-  const accessToken = await this.jwtService.signAsync({
-    sub: result.user.id,
-    email: result.user.email,
-    platformRole: result.user.platformRole,
-  });
-
-  return {
-    user: {
-      id: result.user.id,
+    const accessToken = await this.jwtService.signAsync({
+      sub: result.user.id,
       email: result.user.email,
-      name: result.user.name,
-      status: result.user.status,
       platformRole: result.user.platformRole,
-      emailVerified: result.user.emailVerified,
-    },
+    });
 
-    business: {
-      id: result.business.id,
-      name: result.business.name,
-      countryCode: result.business.countryCode,
-      status: result.business.status,
-    },
+    return {
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        status: result.user.status,
+        platformRole: result.user.platformRole,
+        emailVerified: result.user.emailVerified,
+      },
 
-    membership: {
-      id: result.membership.id,
-      businessId: result.membership.businessId,
-      role: result.membership.role,
-      active: result.membership.active,
-    },
+      business: {
+        id: result.business.id,
+        name: result.business.name,
+        countryCode: result.business.countryCode,
+        status: result.business.status,
+      },
 
-    wallet: {
-      id: result.wallet.id,
-      currency: result.wallet.currency,
-      balance: result.wallet.balance,
-    },
+      membership: {
+        id: result.membership.id,
+        businessId: result.membership.businessId,
+        role: result.membership.role,
+        active: result.membership.active,
+      },
 
-    accessToken,
-  };
-}
+      wallet: {
+        id: result.wallet.id,
+        currency: result.wallet.currency,
+        balance: result.wallet.balance,
+      },
 
-async acceptInvitation(
-  userId: string,
-  dto: AcceptInvitationDto,
-) {
-  const tokenHash =
-    createHash('sha256')
-      .update(dto.token)
-      .digest('hex');
+      accessToken,
+    };
+  }
 
-  const invitation =
-    await this.prisma.businessInvitation.findUnique({
+  async acceptInvitation(userId: string, dto: AcceptInvitationDto) {
+    const tokenHash = createHash('sha256').update(dto.token).digest('hex');
+
+    const invitation = await this.prisma.businessInvitation.findUnique({
       where: {
         tokenHash,
       },
@@ -236,52 +220,33 @@ async acceptInvitation(
       },
     });
 
-  if (!invitation) {
-    throw new BadRequestException(
-      'Invitation is invalid',
-    );
-  }
+    if (!invitation) {
+      throw new BadRequestException('Invitation is invalid');
+    }
 
-  if (
-    invitation.status !==
-    InvitationStatus.PENDING
-  ) {
-    throw new BadRequestException(
-      'Invitation is no longer active',
-    );
-  }
+    if (invitation.status !== InvitationStatus.PENDING) {
+      throw new BadRequestException('Invitation is no longer active');
+    }
 
-  if (
-    invitation.expiresAt.getTime() <=
-    Date.now()
-  ) {
-    await this.prisma.businessInvitation.update({
-      where: {
-        id: invitation.id,
-      },
+    if (invitation.expiresAt.getTime() <= Date.now()) {
+      await this.prisma.businessInvitation.update({
+        where: {
+          id: invitation.id,
+        },
 
-      data: {
-        status:
-          InvitationStatus.EXPIRED,
-      },
-    });
+        data: {
+          status: InvitationStatus.EXPIRED,
+        },
+      });
 
-    throw new BadRequestException(
-      'Invitation has expired',
-    );
-  }
+      throw new BadRequestException('Invitation has expired');
+    }
 
-  if (
-    invitation.business.status !==
-    'ACTIVE'
-  ) {
-    throw new BadRequestException(
-      'Business account is not active',
-    );
-  }
+    if (invitation.business.status !== 'ACTIVE') {
+      throw new BadRequestException('Business account is not active');
+    }
 
-  const user =
-    await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: {
         id: userId,
       },
@@ -293,66 +258,51 @@ async acceptInvitation(
       },
     });
 
-  if (!user) {
-    throw new UnauthorizedException(
-      'User account not found',
-    );
-  }
+    if (!user) {
+      throw new UnauthorizedException('User account not found');
+    }
 
-  if (user.status !== 'ACTIVE') {
-    throw new UnauthorizedException(
-      'Account access is unavailable',
-    );
-  }
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Account access is unavailable');
+    }
 
-  if (
-    user.email.toLowerCase() !==
-    invitation.email.toLowerCase()
-  ) {
-    throw new BadRequestException(
-      'Invitation email does not match authenticated user',
-    );
-  }
+    if (user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+      throw new BadRequestException(
+        'Invitation email does not match authenticated user',
+      );
+    }
 
-  const existingMembership =
-    await this.prisma.businessMembership.findUnique({
+    const existingMembership = await this.prisma.businessMembership.findUnique({
       where: {
         userId_businessId: {
           userId,
-          businessId:
-            invitation.businessId,
+          businessId: invitation.businessId,
         },
       },
     });
 
-  if (existingMembership) {
-    throw new ConflictException(
-      'User is already a member of this business',
-    );
-  }
+    if (existingMembership) {
+      throw new ConflictException('User is already a member of this business');
+    }
 
-  const result =
-    await this.prisma.$transaction(
+    const result = await this.prisma.$transaction(
       async (tx) => {
-        const membership =
-          await tx.businessMembership.create({
-            data: {
-              userId,
-              businessId:
-                invitation.businessId,
-              role:
-                invitation.role,
-              active: true,
-            },
+        const membership = await tx.businessMembership.create({
+          data: {
+            userId,
+            businessId: invitation.businessId,
+            role: invitation.role,
+            active: true,
+          },
 
-            select: {
-              id: true,
-              businessId: true,
-              role: true,
-              active: true,
-              createdAt: true,
-            },
-          });
+          select: {
+            id: true,
+            businessId: true,
+            role: true,
+            active: true,
+            createdAt: true,
+          },
+        });
 
         await tx.businessInvitation.update({
           where: {
@@ -360,14 +310,11 @@ async acceptInvitation(
           },
 
           data: {
-            status:
-              InvitationStatus.ACCEPTED,
+            status: InvitationStatus.ACCEPTED,
 
-            acceptedByUserId:
-              userId,
+            acceptedByUserId: userId,
 
-            acceptedAt:
-              new Date(),
+            acceptedAt: new Date(),
           },
         });
 
@@ -380,16 +327,13 @@ async acceptInvitation(
       },
     );
 
-  return {
-    business: {
-      id:
-        invitation.business.id,
-      name:
-        invitation.business.name,
-    },
+    return {
+      business: {
+        id: invitation.business.id,
+        name: invitation.business.name,
+      },
 
-    membership:
-      result,
-  };
-}
+      membership: result,
+    };
+  }
 }

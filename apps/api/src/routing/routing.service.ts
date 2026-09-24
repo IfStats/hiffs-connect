@@ -1,15 +1,10 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service.js';
 import { CreateRoutingRuleDto } from './dto/create-routing-rule.dto.js';
 
 @Injectable()
 export class RoutingService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   create(dto: CreateRoutingRuleDto) {
     return this.prisma.providerRoutingRule.create({
@@ -38,39 +33,36 @@ export class RoutingService {
   }
 
   async findOne(id: string) {
-    const rule =
-      await this.prisma.providerRoutingRule.findUnique({
-        where: {
-          id,
-        },
-      });
+    const rule = await this.prisma.providerRoutingRule.findUnique({
+      where: {
+        id,
+      },
+    });
 
     if (!rule) {
-      throw new NotFoundException(
-        'Provider routing rule not found',
-      );
+      throw new NotFoundException('Provider routing rule not found');
     }
 
     return rule;
   }
 
   async update(
-  id: string,
-  dto: {
-    priority?: number;
-    enabled?: boolean;
-  },
-) {
-  await this.findOne(id);
+    id: string,
+    dto: {
+      priority?: number;
+      enabled?: boolean;
+    },
+  ) {
+    await this.findOne(id);
 
-  return this.prisma.providerRoutingRule.update({
-    where: {
-      id,
-    },
-    data: {
-      priority: dto.priority,
-      enabled: dto.enabled,
-    },
-  });
-}
+    return this.prisma.providerRoutingRule.update({
+      where: {
+        id,
+      },
+      data: {
+        priority: dto.priority,
+        enabled: dto.enabled,
+      },
+    });
+  }
 }

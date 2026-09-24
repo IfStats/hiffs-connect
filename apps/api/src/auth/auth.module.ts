@@ -27,15 +27,8 @@ import { ApiAuthGuard } from './api-auth.guard.js';
 
   controllers: [AuthController],
 
-  providers: [
-    AuthService,
-    ApiAuthGuard,
-  ],
+  providers: [AuthService, ApiAuthGuard],
 
-  exports: [
-    AuthService,
-    ApiAuthGuard,
-    JwtModule,
-  ],
+  exports: [AuthService, ApiAuthGuard, JwtModule],
 })
 export class AuthModule {}

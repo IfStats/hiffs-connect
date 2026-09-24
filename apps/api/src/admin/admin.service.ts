@@ -10,10 +10,7 @@ import {
   WalletTransactionType,
 } from '@prisma/client';
 
-import {
-  AccountStatus,
-  PlatformRole,
-} from '@prisma/client';
+import { AccountStatus, PlatformRole } from '@prisma/client';
 
 import { UpdateAccountStatusDto } from './dto/update-account-status.dto.js';
 import { UpdatePlatformRoleDto } from './dto/update-platform-role.dto.js';
@@ -126,86 +123,86 @@ export class AdminService {
   }
 
   async listUsers() {
-  return this.prisma.user.findMany({
-    orderBy: {
-      createdAt: 'desc',
-    },
+    return this.prisma.user.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
 
-    select: {
-      id: true,
-      email: true,
-      status: true,
-      name: true,
-      platformRole: true,
-      emailVerified: true,
-      createdAt: true,
-      updatedAt: true,
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        name: true,
+        platformRole: true,
+        emailVerified: true,
+        createdAt: true,
+        updatedAt: true,
 
-      memberships: {
-        select: {
-          id: true,
-          role: true,
-          active: true,
-          businessId: true,
+        memberships: {
+          select: {
+            id: true,
+            role: true,
+            active: true,
+            businessId: true,
 
-          business: {
-            select: {
-              id: true,
-              name: true,
-              countryCode: true,
+            business: {
+              select: {
+                id: true,
+                name: true,
+                countryCode: true,
+              },
             },
           },
         },
       },
-    },
-  });
-}
-
-async getUser(id: string) {
-  const user = await this.prisma.user.findUnique({
-    where: {
-      id,
-    },
-
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      status: true,
-      platformRole: true,
-      emailVerified: true,
-      createdAt: true,
-      updatedAt: true,
-
-      memberships: {
-        select: {
-          id: true,
-          role: true,
-          active: true,
-          businessId: true,
-          createdAt: true,
-          updatedAt: true,
-
-          business: {
-            select: {
-              id: true,
-              name: true,
-              countryCode: true,
-              email: true,
-              website: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!user) {
-    throw new NotFoundException('User not found');
+    });
   }
 
-  return user;
-}
+  async getUser(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id,
+      },
+
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        status: true,
+        platformRole: true,
+        emailVerified: true,
+        createdAt: true,
+        updatedAt: true,
+
+        memberships: {
+          select: {
+            id: true,
+            role: true,
+            active: true,
+            businessId: true,
+            createdAt: true,
+            updatedAt: true,
+
+            business: {
+              select: {
+                id: true,
+                name: true,
+                countryCode: true,
+                email: true,
+                website: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
 
   async getWalletTransactions(businessId: string) {
     const wallet = await this.prisma.wallet.findUnique({
@@ -452,156 +449,150 @@ async getUser(id: string) {
   }
 
   async updateUserStatus(
-  targetUserId: string,
-  actorUserId: string,
-  dto: UpdateAccountStatusDto,
-) {
-  const target = await this.prisma.user.findUnique({
-    where: {
-      id: targetUserId,
-    },
-  });
-
-  if (!target) {
-    throw new NotFoundException('User not found');
-  }
-
-  if (
-    targetUserId === actorUserId &&
-    dto.status !== AccountStatus.ACTIVE
+    targetUserId: string,
+    actorUserId: string,
+    dto: UpdateAccountStatusDto,
   ) {
-    throw new BadRequestException(
-      'You cannot suspend or restrict your own platform account',
-    );
-  }
-
-  if (
-    target.platformRole === PlatformRole.SUPER_ADMIN &&
-    dto.status !== AccountStatus.ACTIVE
-  ) {
-    const activeSuperAdmins = await this.prisma.user.count({
+    const target = await this.prisma.user.findUnique({
       where: {
-        platformRole: PlatformRole.SUPER_ADMIN,
-        status: AccountStatus.ACTIVE,
+        id: targetUserId,
       },
     });
 
-    if (activeSuperAdmins <= 1) {
+    if (!target) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (targetUserId === actorUserId && dto.status !== AccountStatus.ACTIVE) {
       throw new BadRequestException(
-        'Cannot disable the last active SUPER_ADMIN',
+        'You cannot suspend or restrict your own platform account',
       );
     }
-  }
 
-  return this.prisma.user.update({
-    where: {
-      id: targetUserId,
-    },
+    if (
+      target.platformRole === PlatformRole.SUPER_ADMIN &&
+      dto.status !== AccountStatus.ACTIVE
+    ) {
+      const activeSuperAdmins = await this.prisma.user.count({
+        where: {
+          platformRole: PlatformRole.SUPER_ADMIN,
+          status: AccountStatus.ACTIVE,
+        },
+      });
 
-    data: {
-      status: dto.status,
-    },
+      if (activeSuperAdmins <= 1) {
+        throw new BadRequestException(
+          'Cannot disable the last active SUPER_ADMIN',
+        );
+      }
+    }
 
-    select: {
-      id: true,
-      email: true,
-      status: true,
-      platformRole: true,
-      updatedAt: true,
-    },
-  });
-}
-
-async updateBusinessStatus(
-  businessId: string,
-  dto: UpdateAccountStatusDto,
-) {
-  const business = await this.prisma.business.findUnique({
-    where: {
-      id: businessId,
-    },
-  });
-
-  if (!business) {
-    throw new NotFoundException('Business not found');
-  }
-
-  return this.prisma.business.update({
-    where: {
-      id: businessId,
-    },
-
-    data: {
-      status: dto.status,
-    },
-
-    select: {
-      id: true,
-      name: true,
-      status: true,
-      updatedAt: true,
-    },
-  });
-}
-
-async updatePlatformRole(
-  targetUserId: string,
-  actorUserId: string,
-  dto: UpdatePlatformRoleDto,
-) {
-  const target = await this.prisma.user.findUnique({
-    where: {
-      id: targetUserId,
-    },
-  });
-
-  if (!target) {
-    throw new NotFoundException('User not found');
-  }
-
-  if (
-    targetUserId === actorUserId &&
-    dto.platformRole !== PlatformRole.SUPER_ADMIN
-  ) {
-    throw new BadRequestException(
-      'You cannot remove your own SUPER_ADMIN role',
-    );
-  }
-
-  if (
-    target.platformRole === PlatformRole.SUPER_ADMIN &&
-    dto.platformRole !== PlatformRole.SUPER_ADMIN
-  ) {
-    const activeSuperAdmins = await this.prisma.user.count({
+    return this.prisma.user.update({
       where: {
-        platformRole: PlatformRole.SUPER_ADMIN,
-        status: AccountStatus.ACTIVE,
+        id: targetUserId,
+      },
+
+      data: {
+        status: dto.status,
+      },
+
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        platformRole: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async updateBusinessStatus(businessId: string, dto: UpdateAccountStatusDto) {
+    const business = await this.prisma.business.findUnique({
+      where: {
+        id: businessId,
       },
     });
 
-    if (activeSuperAdmins <= 1) {
-      throw new BadRequestException(
-        'Cannot demote the last active SUPER_ADMIN',
-      );
+    if (!business) {
+      throw new NotFoundException('Business not found');
     }
+
+    return this.prisma.business.update({
+      where: {
+        id: businessId,
+      },
+
+      data: {
+        status: dto.status,
+      },
+
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
   }
 
-  return this.prisma.user.update({
-    where: {
-      id: targetUserId,
-    },
+  async updatePlatformRole(
+    targetUserId: string,
+    actorUserId: string,
+    dto: UpdatePlatformRoleDto,
+  ) {
+    const target = await this.prisma.user.findUnique({
+      where: {
+        id: targetUserId,
+      },
+    });
 
-    data: {
-      platformRole: dto.platformRole,
-    },
+    if (!target) {
+      throw new NotFoundException('User not found');
+    }
 
-    select: {
-      id: true,
-      email: true,
-      status: true,
-      platformRole: true,
-      updatedAt: true,
-    },
-  });
-}
+    if (
+      targetUserId === actorUserId &&
+      dto.platformRole !== PlatformRole.SUPER_ADMIN
+    ) {
+      throw new BadRequestException(
+        'You cannot remove your own SUPER_ADMIN role',
+      );
+    }
+
+    if (
+      target.platformRole === PlatformRole.SUPER_ADMIN &&
+      dto.platformRole !== PlatformRole.SUPER_ADMIN
+    ) {
+      const activeSuperAdmins = await this.prisma.user.count({
+        where: {
+          platformRole: PlatformRole.SUPER_ADMIN,
+          status: AccountStatus.ACTIVE,
+        },
+      });
+
+      if (activeSuperAdmins <= 1) {
+        throw new BadRequestException(
+          'Cannot demote the last active SUPER_ADMIN',
+        );
+      }
+    }
+
+    return this.prisma.user.update({
+      where: {
+        id: targetUserId,
+      },
+
+      data: {
+        platformRole: dto.platformRole,
+      },
+
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        platformRole: true,
+        updatedAt: true,
+      },
+    });
+  }
 }

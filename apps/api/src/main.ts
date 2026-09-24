@@ -4,15 +4,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app =
-    await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule);
 
-  const port =
-    Number(process.env.PORT ?? 4000);
+  const port = Number(process.env.PORT ?? 4000);
 
-  const webOrigin =
-    process.env.WEB_ORIGIN ??
-    'http://localhost:3000';
+  const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
 
   app.enableCors({
     origin: webOrigin,
@@ -29,9 +25,7 @@ async function bootstrap() {
 
   await app.listen(port);
 
-  console.log(
-    `Hiffs Connect API running on port ${port}`,
-  );
+  console.log(`Hiffs Connect API running on port ${port}`);
 }
 
 bootstrap();

@@ -17,75 +17,64 @@ import { CreateBusinessInvitationDto } from './dto/create-business-invitation.dt
 
 @Injectable()
 export class BusinessesService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getAccount(businessId: string) {
-    const business =
-      await this.prisma.business.findUnique({
-        where: {
-          id: businessId,
-        },
+    const business = await this.prisma.business.findUnique({
+      where: {
+        id: businessId,
+      },
 
-        select: {
-          id: true,
-          name: true,
-          countryCode: true,
-          email: true,
-          phone: true,
-          website: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
+      select: {
+        id: true,
+        name: true,
+        countryCode: true,
+        email: true,
+        phone: true,
+        website: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
 
-          wallet: {
-            select: {
-              id: true,
-              currency: true,
-              balance: true,
-            },
-          },
-
-          _count: {
-            select: {
-              memberships: true,
-              messages: true,
-              senderIdentities: true,
-              apiKeys: true,
-            },
+        wallet: {
+          select: {
+            id: true,
+            currency: true,
+            balance: true,
           },
         },
-      });
+
+        _count: {
+          select: {
+            memberships: true,
+            messages: true,
+            senderIdentities: true,
+            apiKeys: true,
+          },
+        },
+      },
+    });
 
     if (!business) {
-      throw new NotFoundException(
-        'Business not found',
-      );
+      throw new NotFoundException('Business not found');
     }
 
     return business;
   }
 
-  async updateAccount(
-    businessId: string,
-    dto: UpdateBusinessAccountDto,
-  ) {
-    const business =
-      await this.prisma.business.findUnique({
-        where: {
-          id: businessId,
-        },
+  async updateAccount(businessId: string, dto: UpdateBusinessAccountDto) {
+    const business = await this.prisma.business.findUnique({
+      where: {
+        id: businessId,
+      },
 
-        select: {
-          id: true,
-        },
-      });
+      select: {
+        id: true,
+      },
+    });
 
     if (!business) {
-      throw new NotFoundException(
-        'Business not found',
-      );
+      throw new NotFoundException('Business not found');
     }
 
     return this.prisma.business.update({
@@ -94,19 +83,13 @@ export class BusinessesService {
       },
 
       data: {
-        name:
-          dto.name?.trim(),
+        name: dto.name?.trim(),
 
-        email:
-          dto.email
-            ?.trim()
-            .toLowerCase(),
+        email: dto.email?.trim().toLowerCase(),
 
-        phone:
-          dto.phone?.trim(),
+        phone: dto.phone?.trim(),
 
-        website:
-          dto.website?.trim(),
+        website: dto.website?.trim(),
       },
 
       select: {
@@ -122,9 +105,7 @@ export class BusinessesService {
     });
   }
 
-  async getMembers(
-    businessId: string,
-  ) {
+  async getMembers(businessId: string) {
     return this.prisma.businessMembership.findMany({
       where: {
         businessId,
@@ -154,13 +135,12 @@ export class BusinessesService {
   }
 
   async updateMemberRole(
-  businessId: string,
-  membershipId: string,
-  actorUserId: string,
-  dto: UpdateMemberRoleDto,
-) {
-  const actorMembership =
-    await this.prisma.businessMembership.findUnique({
+    businessId: string,
+    membershipId: string,
+    actorUserId: string,
+    dto: UpdateMemberRoleDto,
+  ) {
+    const actorMembership = await this.prisma.businessMembership.findUnique({
       where: {
         userId_businessId: {
           userId: actorUserId,
@@ -169,14 +149,11 @@ export class BusinessesService {
       },
     });
 
-  if (!actorMembership?.active) {
-    throw new ForbiddenException(
-      'Active business membership required',
-    );
-  }
+    if (!actorMembership?.active) {
+      throw new ForbiddenException('Active business membership required');
+    }
 
-  const targetMembership =
-    await this.prisma.businessMembership.findFirst({
+    const targetMembership = await this.prisma.businessMembership.findFirst({
       where: {
         id: membershipId,
         businessId,
@@ -193,69 +170,64 @@ export class BusinessesService {
       },
     });
 
-  if (!targetMembership) {
-    throw new NotFoundException(
-      'Business member not found',
-    );
-  }
+    if (!targetMembership) {
+      throw new NotFoundException('Business member not found');
+    }
 
-  if (
-    actorMembership.role === BusinessRole.ADMIN &&
-    targetMembership.role === BusinessRole.OWNER
-  ) {
-    throw new ForbiddenException(
-      'ADMIN cannot modify an OWNER',
-    );
-  }
+    if (
+      actorMembership.role === BusinessRole.ADMIN &&
+      targetMembership.role === BusinessRole.OWNER
+    ) {
+      throw new ForbiddenException('ADMIN cannot modify an OWNER');
+    }
 
-  if (dto.role === BusinessRole.OWNER) {
-    throw new BadRequestException(
-      'OWNER assignment requires an ownership transfer',
-    );
-  }
+    if (dto.role === BusinessRole.OWNER) {
+      throw new BadRequestException(
+        'OWNER assignment requires an ownership transfer',
+      );
+    }
 
-  if (targetMembership.role === BusinessRole.OWNER) {
-    throw new BadRequestException(
-      'OWNER role cannot be changed through member role management',
-    );
-  }
+    if (targetMembership.role === BusinessRole.OWNER) {
+      throw new BadRequestException(
+        'OWNER role cannot be changed through member role management',
+      );
+    }
 
-  return this.prisma.businessMembership.update({
-    where: {
-      id: membershipId,
-    },
+    return this.prisma.businessMembership.update({
+      where: {
+        id: membershipId,
+      },
 
-    data: {
-      role: dto.role,
-    },
+      data: {
+        role: dto.role,
+      },
 
-    select: {
-      id: true,
-      businessId: true,
-      role: true,
-      active: true,
-      updatedAt: true,
+      select: {
+        id: true,
+        businessId: true,
+        role: true,
+        active: true,
+        updatedAt: true,
 
-      user: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          status: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            status: true,
+          },
         },
       },
-    },
-  });
-}
+    });
+  }
 
-async updateMemberStatus(
-  businessId: string,
-  membershipId: string,
-  actorUserId: string,
-  dto: UpdateMemberStatusDto,
-) {
-  const actorMembership =
-    await this.prisma.businessMembership.findUnique({
+  async updateMemberStatus(
+    businessId: string,
+    membershipId: string,
+    actorUserId: string,
+    dto: UpdateMemberStatusDto,
+  ) {
+    const actorMembership = await this.prisma.businessMembership.findUnique({
       where: {
         userId_businessId: {
           userId: actorUserId,
@@ -264,14 +236,11 @@ async updateMemberStatus(
       },
     });
 
-  if (!actorMembership?.active) {
-    throw new ForbiddenException(
-      'Active business membership required',
-    );
-  }
+    if (!actorMembership?.active) {
+      throw new ForbiddenException('Active business membership required');
+    }
 
-  const targetMembership =
-    await this.prisma.businessMembership.findFirst({
+    const targetMembership = await this.prisma.businessMembership.findFirst({
       where: {
         id: membershipId,
         businessId,
@@ -288,36 +257,25 @@ async updateMemberStatus(
       },
     });
 
-  if (!targetMembership) {
-    throw new NotFoundException(
-      'Business member not found',
-    );
-  }
+    if (!targetMembership) {
+      throw new NotFoundException('Business member not found');
+    }
 
-  if (
-    actorMembership.role === BusinessRole.ADMIN &&
-    targetMembership.role === BusinessRole.OWNER
-  ) {
-    throw new ForbiddenException(
-      'ADMIN cannot modify an OWNER',
-    );
-  }
+    if (
+      actorMembership.role === BusinessRole.ADMIN &&
+      targetMembership.role === BusinessRole.OWNER
+    ) {
+      throw new ForbiddenException('ADMIN cannot modify an OWNER');
+    }
 
-  if (
-    targetMembership.userId === actorUserId &&
-    dto.active === false
-  ) {
-    throw new BadRequestException(
-      'You cannot deactivate your own membership',
-    );
-  }
+    if (targetMembership.userId === actorUserId && dto.active === false) {
+      throw new BadRequestException(
+        'You cannot deactivate your own membership',
+      );
+    }
 
-  if (
-    targetMembership.role === BusinessRole.OWNER &&
-    dto.active === false
-  ) {
-    const activeOwners =
-      await this.prisma.businessMembership.count({
+    if (targetMembership.role === BusinessRole.OWNER && dto.active === false) {
+      const activeOwners = await this.prisma.businessMembership.count({
         where: {
           businessId,
           role: BusinessRole.OWNER,
@@ -325,58 +283,55 @@ async updateMemberStatus(
         },
       });
 
-    if (activeOwners <= 1) {
-      throw new BadRequestException(
-        'Cannot deactivate the last active OWNER',
-      );
+      if (activeOwners <= 1) {
+        throw new BadRequestException(
+          'Cannot deactivate the last active OWNER',
+        );
+      }
     }
-  }
 
-  return this.prisma.businessMembership.update({
-    where: {
-      id: membershipId,
-    },
+    return this.prisma.businessMembership.update({
+      where: {
+        id: membershipId,
+      },
 
-    data: {
-      active: dto.active,
-    },
+      data: {
+        active: dto.active,
+      },
 
-    select: {
-      id: true,
-      businessId: true,
-      role: true,
-      active: true,
-      updatedAt: true,
+      select: {
+        id: true,
+        businessId: true,
+        role: true,
+        active: true,
+        updatedAt: true,
 
-      user: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          status: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            status: true,
+          },
         },
       },
-    },
-  });
-}
-
-async createInvitation(
-  businessId: string,
-  actorUserId: string,
-  dto: CreateBusinessInvitationDto,
-) {
-  const email = dto.email
-    .trim()
-    .toLowerCase();
-
-  if (dto.role === BusinessRole.OWNER) {
-    throw new BadRequestException(
-      'OWNER cannot be assigned through an invitation',
-    );
+    });
   }
 
-  const actorMembership =
-    await this.prisma.businessMembership.findUnique({
+  async createInvitation(
+    businessId: string,
+    actorUserId: string,
+    dto: CreateBusinessInvitationDto,
+  ) {
+    const email = dto.email.trim().toLowerCase();
+
+    if (dto.role === BusinessRole.OWNER) {
+      throw new BadRequestException(
+        'OWNER cannot be assigned through an invitation',
+      );
+    }
+
+    const actorMembership = await this.prisma.businessMembership.findUnique({
       where: {
         userId_businessId: {
           userId: actorUserId,
@@ -391,14 +346,11 @@ async createInvitation(
       },
     });
 
-  if (!actorMembership?.active) {
-    throw new ForbiddenException(
-      'Active business membership required',
-    );
-  }
+    if (!actorMembership?.active) {
+      throw new ForbiddenException('Active business membership required');
+    }
 
-  const existingUser =
-    await this.prisma.user.findUnique({
+    const existingUser = await this.prisma.user.findUnique({
       where: {
         email,
       },
@@ -408,26 +360,25 @@ async createInvitation(
       },
     });
 
-  if (existingUser) {
-    const existingMembership =
-      await this.prisma.businessMembership.findUnique({
-        where: {
-          userId_businessId: {
-            userId: existingUser.id,
-            businessId,
+    if (existingUser) {
+      const existingMembership =
+        await this.prisma.businessMembership.findUnique({
+          where: {
+            userId_businessId: {
+              userId: existingUser.id,
+              businessId,
+            },
           },
-        },
-      });
+        });
 
-    if (existingMembership) {
-      throw new BadRequestException(
-        'User is already a member of this business',
-      );
+      if (existingMembership) {
+        throw new BadRequestException(
+          'User is already a member of this business',
+        );
+      }
     }
-  }
 
-  const existingInvite =
-    await this.prisma.businessInvitation.findFirst({
+    const existingInvite = await this.prisma.businessInvitation.findFirst({
       where: {
         businessId,
         email,
@@ -438,35 +389,25 @@ async createInvitation(
       },
     });
 
-  if (existingInvite) {
-    throw new BadRequestException(
-      'An active invitation already exists for this email',
-    );
-  }
+    if (existingInvite) {
+      throw new BadRequestException(
+        'An active invitation already exists for this email',
+      );
+    }
 
-  const rawToken =
-    randomBytes(32).toString('hex');
+    const rawToken = randomBytes(32).toString('hex');
 
-  const tokenHash =
-    createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
 
-  const expiresAt =
-    new Date(
-      Date.now() +
-        7 * 24 * 60 * 60 * 1000,
-    );
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const invitation =
-    await this.prisma.businessInvitation.create({
+    const invitation = await this.prisma.businessInvitation.create({
       data: {
         businessId,
         email,
         role: dto.role,
         tokenHash,
-        invitedByUserId:
-          actorUserId,
+        invitedByUserId: actorUserId,
         expiresAt,
       },
 
@@ -495,146 +436,112 @@ async createInvitation(
       },
     });
 
-  return {
-    invitation,
+    return {
+      invitation,
 
-    inviteToken:
-      rawToken,
-  };
-}
+      inviteToken: rawToken,
+    };
+  }
 
-async getInvitations(
-  businessId: string,
-) {
-  return this.prisma.businessInvitation.findMany({
-    where: {
-      businessId,
-    },
-
-    orderBy: {
-      createdAt: 'desc',
-    },
-
-    select: {
-      id: true,
-      email: true,
-      role: true,
-      status: true,
-      expiresAt: true,
-      acceptedAt: true,
-      revokedAt: true,
-      createdAt: true,
-
-      invitedByUser: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
-        },
+  async getInvitations(businessId: string) {
+    return this.prisma.businessInvitation.findMany({
+      where: {
+        businessId,
       },
 
-      acceptedByUser: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
+      orderBy: {
+        createdAt: 'desc',
+      },
+
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        status: true,
+        expiresAt: true,
+        acceptedAt: true,
+        revokedAt: true,
+        createdAt: true,
+
+        invitedByUser: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+
+        acceptedByUser: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
         },
       },
-    },
-  });
-}
+    });
+  }
 
-async revokeInvitation(
-  businessId: string,
-  invitationId: string,
-) {
-  const invitation =
-    await this.prisma.businessInvitation.findFirst({
+  async revokeInvitation(businessId: string, invitationId: string) {
+    const invitation = await this.prisma.businessInvitation.findFirst({
       where: {
         id: invitationId,
         businessId,
       },
     });
 
-  if (!invitation) {
-    throw new NotFoundException(
-      'Invitation not found',
-    );
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+
+    if (invitation.status !== 'PENDING') {
+      throw new BadRequestException('Only pending invitations can be revoked');
+    }
+
+    return this.prisma.businessInvitation.update({
+      where: {
+        id: invitation.id,
+      },
+
+      data: {
+        status: 'REVOKED',
+        revokedAt: new Date(),
+      },
+
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        status: true,
+        revokedAt: true,
+        updatedAt: true,
+      },
+    });
   }
 
-  if (
-    invitation.status !==
-    'PENDING'
-  ) {
-    throw new BadRequestException(
-      'Only pending invitations can be revoked',
-    );
-  }
-
-  return this.prisma.businessInvitation.update({
-    where: {
-      id: invitation.id,
-    },
-
-    data: {
-      status: 'REVOKED',
-      revokedAt: new Date(),
-    },
-
-    select: {
-      id: true,
-      email: true,
-      role: true,
-      status: true,
-      revokedAt: true,
-      updatedAt: true,
-    },
-  });
-}
-
-async resendInvitation(
-  businessId: string,
-  invitationId: string,
-) {
-  const invitation =
-    await this.prisma.businessInvitation.findFirst({
+  async resendInvitation(businessId: string, invitationId: string) {
+    const invitation = await this.prisma.businessInvitation.findFirst({
       where: {
         id: invitationId,
         businessId,
       },
     });
 
-  if (!invitation) {
-    throw new NotFoundException(
-      'Invitation not found',
-    );
-  }
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
 
-  if (
-    invitation.status !==
-    'PENDING'
-  ) {
-    throw new BadRequestException(
-      'Only pending invitations can be resent',
-    );
-  }
+    if (invitation.status !== 'PENDING') {
+      throw new BadRequestException('Only pending invitations can be resent');
+    }
 
-  const rawToken =
-    randomBytes(32).toString('hex');
+    const rawToken = randomBytes(32).toString('hex');
 
-  const tokenHash =
-    createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
 
-  const expiresAt =
-    new Date(
-      Date.now() +
-        7 * 24 * 60 * 60 * 1000,
-    );
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const updatedInvitation =
-    await this.prisma.businessInvitation.update({
+    const updatedInvitation = await this.prisma.businessInvitation.update({
       where: {
         id: invitation.id,
       },
@@ -655,12 +562,10 @@ async resendInvitation(
       },
     });
 
-  return {
-    invitation:
-      updatedInvitation,
+    return {
+      invitation: updatedInvitation,
 
-    inviteToken:
-      rawToken,
-  };
-}
+      inviteToken: rawToken,
+    };
+  }
 }

@@ -1,10 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { PricingService } from './pricing.service.js';
 import { CreatePricingDto } from './dto/create-pricing.dto.js';
 

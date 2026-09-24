@@ -50,13 +50,12 @@ export class SenderRegistrationsService {
   }
 
   async findOne(id: string) {
-    const registration =
-      await this.prisma.senderRegistration.findUnique({
-        where: { id },
-        include: {
-          business: true,
-        },
-      });
+    const registration = await this.prisma.senderRegistration.findUnique({
+      where: { id },
+      include: {
+        business: true,
+      },
+    });
 
     if (!registration) {
       throw new NotFoundException('Sender registration not found');
@@ -66,89 +65,76 @@ export class SenderRegistrationsService {
   }
 
   async updateStatus(
-  id: string,
-  dto: {
-    status:
-      | 'DRAFT'
-      | 'SUBMITTED'
-      | 'PENDING'
-      | 'APPROVED'
-      | 'REJECTED'
-      | 'SUSPENDED';
-    providerReference?: string;
-    rejectionReason?: string;
-  },
-) {
-  const registration = await this.findOne(id);
-  const status = dto.status;
-
-  const allowedTransitions: Record<
-    typeof registration.status,
-    Array<typeof registration.status>
-  > = {
-    DRAFT: ['SUBMITTED'],
-    SUBMITTED: ['PENDING'],
-    PENDING: ['APPROVED', 'REJECTED'],
-    APPROVED: ['SUSPENDED'],
-    REJECTED: ['DRAFT'],
-    SUSPENDED: ['APPROVED'],
-  };
-
-  const allowed = allowedTransitions[registration.status];
-
-  if (!allowed.includes(status)) {
-    throw new BadRequestException(
-      `Invalid sender status transition: ${registration.status} -> ${status}`,
-    );
-  }
-
-  if (status === 'REJECTED' && !dto.rejectionReason) {
-    throw new BadRequestException(
-      'rejectionReason is required when rejecting a sender registration',
-    );
-  }
-
-  const now = new Date();
-
-  return this.prisma.senderRegistration.update({
-    where: { id },
-    data: {
-      status,
-
-      providerReference:
-        dto.providerReference ?? undefined,
-
-      rejectionReason:
-        status === 'REJECTED'
-          ? dto.rejectionReason
-          : status === 'DRAFT'
-            ? null
-            : undefined,
-
-      submittedAt:
-        status === 'SUBMITTED'
-          ? now
-          : status === 'DRAFT'
-            ? null
-            : undefined,
-
-      approvedAt:
-        status === 'APPROVED'
-          ? now
-          : status === 'DRAFT'
-            ? null
-            : undefined,
-
-      rejectedAt:
-        status === 'REJECTED'
-          ? now
-          : status === 'DRAFT'
-            ? null
-            : undefined,
+    id: string,
+    dto: {
+      status:
+        | 'DRAFT'
+        | 'SUBMITTED'
+        | 'PENDING'
+        | 'APPROVED'
+        | 'REJECTED'
+        | 'SUSPENDED';
+      providerReference?: string;
+      rejectionReason?: string;
     },
-    include: {
-      business: true,
-    },
-  });
-}
+  ) {
+    const registration = await this.findOne(id);
+    const status = dto.status;
+
+    const allowedTransitions: Record<
+      typeof registration.status,
+      Array<typeof registration.status>
+    > = {
+      DRAFT: ['SUBMITTED'],
+      SUBMITTED: ['PENDING'],
+      PENDING: ['APPROVED', 'REJECTED'],
+      APPROVED: ['SUSPENDED'],
+      REJECTED: ['DRAFT'],
+      SUSPENDED: ['APPROVED'],
+    };
+
+    const allowed = allowedTransitions[registration.status];
+
+    if (!allowed.includes(status)) {
+      throw new BadRequestException(
+        `Invalid sender status transition: ${registration.status} -> ${status}`,
+      );
+    }
+
+    if (status === 'REJECTED' && !dto.rejectionReason) {
+      throw new BadRequestException(
+        'rejectionReason is required when rejecting a sender registration',
+      );
+    }
+
+    const now = new Date();
+
+    return this.prisma.senderRegistration.update({
+      where: { id },
+      data: {
+        status,
+
+        providerReference: dto.providerReference ?? undefined,
+
+        rejectionReason:
+          status === 'REJECTED'
+            ? dto.rejectionReason
+            : status === 'DRAFT'
+              ? null
+              : undefined,
+
+        submittedAt:
+          status === 'SUBMITTED' ? now : status === 'DRAFT' ? null : undefined,
+
+        approvedAt:
+          status === 'APPROVED' ? now : status === 'DRAFT' ? null : undefined,
+
+        rejectedAt:
+          status === 'REJECTED' ? now : status === 'DRAFT' ? null : undefined,
+      },
+      include: {
+        business: true,
+      },
+    });
+  }
 }

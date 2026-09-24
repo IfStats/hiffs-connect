@@ -7,18 +7,10 @@ import { AdminController } from './admin.controller.js';
 import { AdminService } from './admin.service.js';
 
 @Module({
-  imports: [
-    PrismaModule,
-    AuthModule,
-    AuthzModule,
-  ],
+  imports: [PrismaModule, AuthModule, AuthzModule],
 
-  controllers: [
-    AdminController,
-  ],
+  controllers: [AdminController],
 
-  providers: [
-    AdminService,
-  ],
+  providers: [AdminService],
 })
 export class AdminModule {}

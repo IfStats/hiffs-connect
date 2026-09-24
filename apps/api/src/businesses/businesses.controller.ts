@@ -28,32 +28,21 @@ type AuthenticatedRequest = Request & {
 };
 
 @Controller('businesses')
-@UseGuards(
-  ApiAuthGuard,
-  BusinessPermissionGuard,
-)
+@UseGuards(ApiAuthGuard, BusinessPermissionGuard)
 export class BusinessesController {
-  constructor(
-    private readonly businessesService: BusinessesService,
-  ) {}
+  constructor(private readonly businessesService: BusinessesService) {}
 
   @Get(':businessId/account')
-  @RequirePermissions(
-    Permission.BUSINESS_READ,
-  )
+  @RequirePermissions(Permission.BUSINESS_READ)
   getAccount(
     @Param('businessId')
     businessId: string,
   ) {
-    return this.businessesService.getAccount(
-      businessId,
-    );
+    return this.businessesService.getAccount(businessId);
   }
 
   @Patch(':businessId/account')
-  @RequirePermissions(
-    Permission.BUSINESS_UPDATE,
-  )
+  @RequirePermissions(Permission.BUSINESS_UPDATE)
   updateAccount(
     @Param('businessId')
     businessId: string,
@@ -61,143 +50,112 @@ export class BusinessesController {
     @Body()
     dto: UpdateBusinessAccountDto,
   ) {
-    return this.businessesService.updateAccount(
-      businessId,
-      dto,
-    );
+    return this.businessesService.updateAccount(businessId, dto);
   }
 
   @Get(':businessId/members')
-  @RequirePermissions(
-    Permission.MEMBER_READ,
-  )
+  @RequirePermissions(Permission.MEMBER_READ)
   getMembers(
     @Param('businessId')
     businessId: string,
   ) {
-    return this.businessesService.getMembers(
-      businessId,
-    );
+    return this.businessesService.getMembers(businessId);
   }
 
   @Patch(':businessId/members/:membershipId/role')
-@RequirePermissions(
-  Permission.MEMBER_UPDATE_ROLE,
-)
-updateMemberRole(
-  @Param('businessId')
-  businessId: string,
+  @RequirePermissions(Permission.MEMBER_UPDATE_ROLE)
+  updateMemberRole(
+    @Param('businessId')
+    businessId: string,
 
-  @Param('membershipId')
-  membershipId: string,
+    @Param('membershipId')
+    membershipId: string,
 
-  @Body()
-  dto: UpdateMemberRoleDto,
+    @Body()
+    dto: UpdateMemberRoleDto,
 
-  @Req()
-  request: AuthenticatedRequest,
-) {
-  return this.businessesService.updateMemberRole(
-    businessId,
-    membershipId,
-    request.user.id,
-    dto,
-  );
-}
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    return this.businessesService.updateMemberRole(
+      businessId,
+      membershipId,
+      request.user.id,
+      dto,
+    );
+  }
 
-@Patch(':businessId/members/:membershipId/status')
-@RequirePermissions(
-  Permission.MEMBER_REMOVE,
-)
-updateMemberStatus(
-  @Param('businessId')
-  businessId: string,
+  @Patch(':businessId/members/:membershipId/status')
+  @RequirePermissions(Permission.MEMBER_REMOVE)
+  updateMemberStatus(
+    @Param('businessId')
+    businessId: string,
 
-  @Param('membershipId')
-  membershipId: string,
+    @Param('membershipId')
+    membershipId: string,
 
-  @Body()
-  dto: UpdateMemberStatusDto,
+    @Body()
+    dto: UpdateMemberStatusDto,
 
-  @Req()
-  request: AuthenticatedRequest,
-) {
-  return this.businessesService.updateMemberStatus(
-    businessId,
-    membershipId,
-    request.user.id,
-    dto,
-  );
-}
-@Post(':businessId/invitations')
-@RequirePermissions(
-  Permission.MEMBER_INVITE,
-)
-createInvitation(
-  @Param('businessId')
-  businessId: string,
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    return this.businessesService.updateMemberStatus(
+      businessId,
+      membershipId,
+      request.user.id,
+      dto,
+    );
+  }
+  @Post(':businessId/invitations')
+  @RequirePermissions(Permission.MEMBER_INVITE)
+  createInvitation(
+    @Param('businessId')
+    businessId: string,
 
-  @Body()
-  dto: CreateBusinessInvitationDto,
+    @Body()
+    dto: CreateBusinessInvitationDto,
 
-  @Req()
-  request: AuthenticatedRequest,
-) {
-  return this.businessesService.createInvitation(
-    businessId,
-    request.user.id,
-    dto,
-  );
-}
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    return this.businessesService.createInvitation(
+      businessId,
+      request.user.id,
+      dto,
+    );
+  }
 
-@Get(':businessId/invitations')
-@RequirePermissions(
-  Permission.MEMBER_READ,
-)
-getInvitations(
-  @Param('businessId')
-  businessId: string,
-) {
-  return this.businessesService.getInvitations(
-    businessId,
-  );
-}
+  @Get(':businessId/invitations')
+  @RequirePermissions(Permission.MEMBER_READ)
+  getInvitations(
+    @Param('businessId')
+    businessId: string,
+  ) {
+    return this.businessesService.getInvitations(businessId);
+  }
 
-@Post(
-  ':businessId/invitations/:invitationId/revoke',
-)
-@RequirePermissions(
-  Permission.MEMBER_INVITE,
-)
-revokeInvitation(
-  @Param('businessId')
-  businessId: string,
+  @Post(':businessId/invitations/:invitationId/revoke')
+  @RequirePermissions(Permission.MEMBER_INVITE)
+  revokeInvitation(
+    @Param('businessId')
+    businessId: string,
 
-  @Param('invitationId')
-  invitationId: string,
-) {
-  return this.businessesService.revokeInvitation(
-    businessId,
-    invitationId,
-  );
-}
+    @Param('invitationId')
+    invitationId: string,
+  ) {
+    return this.businessesService.revokeInvitation(businessId, invitationId);
+  }
 
-@Post(
-  ':businessId/invitations/:invitationId/resend',
-)
-@RequirePermissions(
-  Permission.MEMBER_INVITE,
-)
-resendInvitation(
-  @Param('businessId')
-  businessId: string,
+  @Post(':businessId/invitations/:invitationId/resend')
+  @RequirePermissions(Permission.MEMBER_INVITE)
+  resendInvitation(
+    @Param('businessId')
+    businessId: string,
 
-  @Param('invitationId')
-  invitationId: string,
-) {
-  return this.businessesService.resendInvitation(
-    businessId,
-    invitationId,
-  );
-}
+    @Param('invitationId')
+    invitationId: string,
+  ) {
+    return this.businessesService.resendInvitation(businessId, invitationId);
+  }
 }

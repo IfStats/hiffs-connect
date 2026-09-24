@@ -8,22 +8,12 @@ import { BusinessesController } from './businesses.controller.js';
 import { BusinessesService } from './businesses.service.js';
 
 @Module({
-  imports: [
-    PrismaModule,
-    AuthModule,
-    AuthzModule,
-  ],
+  imports: [PrismaModule, AuthModule, AuthzModule],
 
-  controllers: [
-    BusinessesController,
-  ],
+  controllers: [BusinessesController],
 
-  providers: [
-    BusinessesService,
-  ],
+  providers: [BusinessesService],
 
-  exports: [
-    BusinessesService,
-  ],
+  exports: [BusinessesService],
 })
 export class BusinessesModule {}

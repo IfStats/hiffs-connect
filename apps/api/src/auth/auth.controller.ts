@@ -1,14 +1,6 @@
-import {
-  Body,
-  Controller,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 
-import type {
-  Request,
-} from 'express';
+import type { Request } from 'express';
 
 import { ApiAuthGuard } from './api-auth.guard.js';
 import type { AuthUser } from './auth-user.type.js';
@@ -35,25 +27,22 @@ export class AuthController {
   }
 
   @Post('signup')
-signup(
-  @Body()
-  dto: SignupDto,
-) {
-  return this.authService.signup(dto);
-}
+  signup(
+    @Body()
+    dto: SignupDto,
+  ) {
+    return this.authService.signup(dto);
+  }
 
-@Post('invitations/accept')
-@UseGuards(ApiAuthGuard)
-acceptInvitation(
-  @Body()
-  dto: AcceptInvitationDto,
+  @Post('invitations/accept')
+  @UseGuards(ApiAuthGuard)
+  acceptInvitation(
+    @Body()
+    dto: AcceptInvitationDto,
 
-  @Req()
-  request: AuthenticatedRequest,
-) {
-  return this.authService.acceptInvitation(
-    request.user.id,
-    dto,
-  );
-}
+    @Req()
+    request: AuthenticatedRequest,
+  ) {
+    return this.authService.acceptInvitation(request.user.id, dto);
+  }
 }

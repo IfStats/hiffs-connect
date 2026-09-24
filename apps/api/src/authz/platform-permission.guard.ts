@@ -50,9 +50,7 @@ export class PlatformPermissionGuard implements CanActivate {
     );
 
     if (!allowed) {
-      throw new ForbiddenException(
-        'Insufficient platform permissions',
-      );
+      throw new ForbiddenException('Insufficient platform permissions');
     }
 
     return true;
