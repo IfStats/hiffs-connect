@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { MobileNav } from './mobile-nav';
+
 function Logo() {
   return (
     <Link
@@ -80,7 +82,7 @@ const benefits = [
 export default function Home() {
   return (
     <main className="min-h-screen bg-white text-slate-950">
-      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur">
+      <header className="relative sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
           <Logo />
 
@@ -129,20 +131,24 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="hidden rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 sm:inline-flex"
-            >
-              Sign In
-            </Link>
+  <div className="hidden items-center gap-3 lg:flex">
+    <Link
+      href="/login"
+      className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+    >
+      Sign In
+    </Link>
 
-            <Link
-              href="/signup"
-              className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-            >
-              Get Started
-            </Link>
-          </div>
+    <Link
+      href="/signup"
+      className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+    >
+      Get Started
+    </Link>
+  </div>
+
+  <MobileNav />
+</div>
         </div>
       </header>
 
