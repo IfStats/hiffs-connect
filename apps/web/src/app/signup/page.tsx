@@ -123,21 +123,120 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-12">
-      <section className="mx-auto w-full max-w-2xl">
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+  <main className="grid min-h-screen bg-white lg:grid-cols-[0.9fr_1.1fr]">
+    <section className="relative hidden overflow-hidden bg-slate-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,0.35),transparent_35%),radial-gradient(circle_at_80%_80%,rgba(6,182,212,0.25),transparent_35%)]" />
+
+      <div className="relative">
+        <Link
+          href="/"
+          className="flex items-center gap-3"
+        >
+          <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 font-black shadow-lg shadow-blue-950/40">
+            HC
+
+            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-slate-950 bg-emerald-400" />
+          </div>
+
           <div>
-            <p className="text-sm font-medium text-blue-600">
+            <p className="font-bold">
               Hiffs Connect
             </p>
 
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-              Create your business workspace
-            </h1>
+            <p className="text-xs text-slate-400">
+              Business Messaging
+            </p>
+          </div>
+        </Link>
+      </div>
 
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Create your account and start configuring messaging,
-              sender identities and API access.
+      <div className="relative max-w-xl">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-400">
+          Reliable • Fast • Global
+        </p>
+
+        <h1 className="mt-6 text-5xl font-bold leading-tight tracking-tight">
+          Build better customer communication from one platform.
+        </h1>
+
+        <p className="mt-6 text-lg leading-8 text-slate-400">
+          Create your Hiffs Connect workspace to manage
+          messaging, sender identities, API integrations,
+          wallet funding and delivery reporting.
+        </p>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          {[
+            'Business SMS',
+            'API Integration',
+            'Sender Management',
+            'Delivery Reporting',
+          ].map((item) => (
+            <div
+              key={item}
+              className="flex items-center gap-3"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/15 text-sm text-blue-300">
+                ✓
+              </div>
+
+              <span className="text-sm text-slate-300">
+                {item}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="relative">
+        <p className="text-sm text-slate-500">
+          A product of Hiffs Global Enterprises
+        </p>
+
+        <p className="mt-1 text-xs text-slate-600">
+          © 2026 Hiffs Global Enterprises
+        </p>
+      </div>
+    </section>
+
+    <section className="flex items-center justify-center bg-slate-50 px-5 py-10 sm:px-8 lg:px-12">
+      <div className="w-full max-w-2xl">
+        <div className="mb-8 flex items-center justify-between lg:hidden">
+          <Link
+            href="/"
+            className="flex items-center gap-3"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-sm font-black text-white">
+              HC
+            </div>
+
+            <span className="font-bold">
+              Hiffs Connect
+            </span>
+          </Link>
+
+          <Link
+            href="/login"
+            className="text-sm font-semibold text-blue-600"
+          >
+            Sign in
+          </Link>
+        </div>
+
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10">
+          <div>
+            <p className="text-sm font-semibold text-blue-600">
+              Get started
+            </p>
+
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+              Create your business workspace
+            </h2>
+
+            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500">
+              Set up your account and prepare your
+              business for messaging, sender approval
+              and API access.
             </p>
           </div>
 
@@ -148,7 +247,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="name"
-                className="block text-sm font-medium"
+                className="text-sm font-medium text-slate-700"
               >
                 Your name
               </label>
@@ -159,16 +258,17 @@ export default function SignupPage() {
                 type="text"
                 required
                 autoComplete="name"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                placeholder="Joshua Akunna"
+                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
               />
             </div>
 
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium"
+                className="text-sm font-medium text-slate-700"
               >
-                Email
+                Work email
               </label>
 
               <input
@@ -177,14 +277,15 @@ export default function SignupPage() {
                 type="email"
                 required
                 autoComplete="email"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                placeholder="you@company.com"
+                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
               />
             </div>
 
             <div>
               <label
                 htmlFor="businessName"
-                className="block text-sm font-medium"
+                className="text-sm font-medium text-slate-700"
               >
                 Business name
               </label>
@@ -194,35 +295,42 @@ export default function SignupPage() {
                 name="businessName"
                 type="text"
                 required
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                placeholder="Your company"
+                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
               />
             </div>
 
             <div>
               <label
                 htmlFor="countryCode"
-                className="block text-sm font-medium"
+                className="text-sm font-medium text-slate-700"
               >
-                Country code
+                Country
               </label>
 
-              <input
+              <select
                 id="countryCode"
                 name="countryCode"
-                type="text"
                 required
-                maxLength={2}
                 defaultValue="GH"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 uppercase"
-              />
+                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+              >
+                <option value="GH">
+                  Ghana
+                </option>
+
+                <option value="NG">
+                  Nigeria
+                </option>
+              </select>
             </div>
 
             <div>
               <label
                 htmlFor="phone"
-                className="block text-sm font-medium"
+                className="text-sm font-medium text-slate-700"
               >
-                Phone
+                Phone number
               </label>
 
               <input
@@ -230,14 +338,15 @@ export default function SignupPage() {
                 name="phone"
                 type="tel"
                 autoComplete="tel"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                placeholder="+233..."
+                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
               />
             </div>
 
             <div>
               <label
                 htmlFor="website"
-                className="block text-sm font-medium"
+                className="text-sm font-medium text-slate-700"
               >
                 Website
               </label>
@@ -247,14 +356,14 @@ export default function SignupPage() {
                 name="website"
                 type="url"
                 placeholder="https://example.com"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
               />
             </div>
 
             <div className="sm:col-span-2">
               <label
                 htmlFor="password"
-                className="block text-sm font-medium"
+                className="text-sm font-medium text-slate-700"
               >
                 Password
               </label>
@@ -266,21 +375,26 @@ export default function SignupPage() {
                 required
                 minLength={8}
                 autoComplete="new-password"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                placeholder="Minimum 8 characters"
+                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
               />
+
+              <p className="mt-2 text-xs text-slate-400">
+                Use at least 8 characters.
+              </p>
             </div>
 
-            {error ? (
-              <p className="sm:col-span-2 text-sm text-red-600">
+            {error && (
+              <div className="sm:col-span-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
-              </p>
-            ) : null}
+              </div>
+            )}
 
             <div className="sm:col-span-2">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-lg bg-slate-950 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
+                className="flex h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading
                   ? 'Creating workspace...'
@@ -289,17 +403,24 @@ export default function SignupPage() {
             </div>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
+          <div className="mt-6 text-center text-xs leading-5 text-slate-400">
+            By creating an account, you agree to
+            Hiffs Connect&apos;s Terms of Service and
+            Privacy Policy.
+          </div>
+
+          <div className="mt-7 border-t border-slate-100 pt-6 text-center text-sm text-slate-500">
             Already have an account?{' '}
             <Link
               href="/login"
-              className="font-medium text-blue-600"
+              className="font-semibold text-blue-600"
             >
               Sign in
             </Link>
-          </p>
+          </div>
         </div>
-      </section>
-    </main>
-  );
+      </div>
+    </section>
+  </main>
+);
 }
