@@ -55,6 +55,12 @@ enum PlatformRole {
   COMPLIANCE
 }
 
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  RESTRICTED
+}
+
 model Business {
   id          String  @id @default(cuid())
   name        String
@@ -69,6 +75,7 @@ model Business {
   apiKeys          ApiKey[]
   senderIdentities SenderIdentity[]
   memberships      BusinessMembership[]
+  status           AccountStatus        @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -267,6 +274,9 @@ model WalletTransaction {
   messageId String?
   message   Message? @relation(fields: [messageId], references: [id])
 
+  performedByUserId String?
+  performedByUser   User?   @relation("WalletTransactionPerformedBy", fields: [performedByUserId], references: [id])
+
   type   WalletTransactionType
   status WalletTransactionStatus @default(COMPLETED)
 
@@ -283,6 +293,7 @@ model WalletTransaction {
 
   @@index([walletId])
   @@index([messageId])
+  @@index([performedByUserId])
   @@index([type])
   @@index([status])
   @@index([createdAt])
@@ -398,7 +409,9 @@ model User {
 
   platformRole PlatformRole?
 
-  memberships BusinessMembership[]
+  memberships                 BusinessMembership[]
+  walletTransactionsPerformed WalletTransaction[]  @relation("WalletTransactionPerformedBy")
+  status                      AccountStatus        @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

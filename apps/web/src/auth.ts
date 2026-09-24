@@ -1,5 +1,53 @@
-import type { NextAuthOptions } from 'next-auth';
+import type {
+  DefaultSession,
+  NextAuthOptions,
+  User,
+} from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
+
+type ApiMembership = {
+  id: string;
+  businessId: string;
+  businessName: string;
+  role: string;
+};
+
+type ApiAuthUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  platformRole: string | null;
+  memberships: ApiMembership[];
+  accessToken: string;
+};
+
+type AppUser = User & {
+  businessId: string | null;
+  businessName: string | null;
+  businessRole: string | null;
+  platformRole: string | null;
+  accessToken: string | null;
+};
+
+type AppToken = JWT & {
+  userId?: string;
+  businessId?: string | null;
+  businessName?: string | null;
+  businessRole?: string | null;
+  platformRole?: string | null;
+  accessToken?: string | null;
+};
+
+type AppSessionUser = DefaultSession['user'] & {
+  id: string;
+  businessId: string | null;
+  businessName: string | null;
+  businessRole: string | null;
+  platformRole: string | null;
+  accessToken: string | null;
+};
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -38,108 +86,117 @@ export const authOptions: NextAuthOptions = {
           process.env.HIFFS_API_URL ??
           'http://localhost:4000';
 
-        const response =
-          await fetch(
-            `${apiBaseUrl}/auth/credentials`,
-            {
-              method: 'POST',
+        const response = await fetch(
+          `${apiBaseUrl}/auth/credentials`,
+          {
+            method: 'POST',
 
-              headers: {
-                'Content-Type':
-                  'application/json',
-              },
-
-              body: JSON.stringify({
-                email:
-                  credentials.email,
-                password:
-                  credentials.password,
-              }),
-
-              cache: 'no-store',
+            headers: {
+              'Content-Type': 'application/json',
             },
-          );
+
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+            }),
+
+            cache: 'no-store',
+          },
+        );
 
         if (!response.ok) {
           return null;
         }
 
-        const user =
-          await response.json();
+        const apiUser =
+          (await response.json()) as ApiAuthUser;
 
         const membership =
-          user.memberships?.[0];
+          apiUser.memberships?.[0];
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
+        const user: AppUser = {
+          id: apiUser.id,
+          email: apiUser.email,
+          name: apiUser.name,
+          image: apiUser.image,
 
           businessId:
-            membership?.businessId ??
-            null,
+            membership?.businessId ?? null,
 
           businessName:
-            membership?.businessName ??
-            null,
+            membership?.businessName ?? null,
 
           businessRole:
-            membership?.role ??
-            null,
+            membership?.role ?? null,
 
           platformRole:
-            user.platformRole ??
-            null,
+            apiUser.platformRole ?? null,
+
+          accessToken:
+            apiUser.accessToken ?? null,
         };
+
+        return user;
       },
     }),
   ],
 
   callbacks: {
-    async jwt({
-      token,
-      user,
-    }) {
+    async jwt({ token, user }) {
+      const appToken =
+        token as AppToken;
+
       if (user) {
-        token.userId =
-          user.id;
+        const appUser =
+          user as AppUser;
 
-        token.businessId =
-          (user as any).businessId;
+        appToken.userId =
+          appUser.id;
 
-        token.businessName =
-          (user as any).businessName;
+        appToken.businessId =
+          appUser.businessId;
 
-        token.businessRole =
-          (user as any).businessRole;
+        appToken.businessName =
+          appUser.businessName;
 
-        token.platformRole =
-          (user as any).platformRole;
+        appToken.businessRole =
+          appUser.businessRole;
+
+        appToken.platformRole =
+          appUser.platformRole;
+
+        appToken.accessToken =
+          appUser.accessToken;
       }
 
-      return token;
+      return appToken;
     },
 
-    async session({
-      session,
-      token,
-    }) {
+    async session({ session, token }) {
+      const appToken =
+        token as AppToken;
+
       if (session.user) {
-        (session.user as any).id =
-          token.userId;
+        const sessionUser =
+          session.user as AppSessionUser;
 
-        (session.user as any).businessId =
-          token.businessId;
+        sessionUser.id =
+          appToken.userId ?? '';
 
-        (session.user as any).businessName =
-          token.businessName;
+        sessionUser.businessId =
+          appToken.businessId ?? null;
 
-        (session.user as any).businessRole =
-          token.businessRole;
+        sessionUser.businessName =
+          appToken.businessName ?? null;
 
-        (session.user as any).platformRole =
-          token.platformRole;
+        sessionUser.businessRole =
+          appToken.businessRole ?? null;
+
+        sessionUser.platformRole =
+          appToken.platformRole ?? null;
+
+        sessionUser.accessToken =
+          appToken.accessToken ?? null;
       }
 
       return session;
