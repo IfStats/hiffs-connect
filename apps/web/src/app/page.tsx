@@ -4,18 +4,22 @@ function Logo() {
   return (
     <Link
       href="/"
-      className="flex items-center gap-3"
+      className="group flex items-center gap-3"
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg font-bold text-white shadow-sm">
-        •••
+      <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-600/20">
+        <span className="text-sm font-black tracking-[-0.08em]">
+          HC
+        </span>
+
+        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />
       </div>
 
       <div>
-        <div className="text-lg font-bold tracking-tight text-slate-950">
+        <div className="text-lg font-bold tracking-tight text-slate-950 transition group-hover:text-blue-600">
           Hiffs Connect
         </div>
 
-        <div className="text-xs text-slate-500">
+        <div className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
           Business Messaging
         </div>
       </div>
