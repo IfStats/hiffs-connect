@@ -92,28 +92,36 @@ export class ApiKeysService {
     });
   }
 
-  async revoke(id: string) {
-    const key = await this.prisma.apiKey.findUnique({
+  async revoke(
+  businessId: string,
+  id: string,
+) {
+  const key =
+    await this.prisma.apiKey.findFirst({
       where: {
         id,
+        businessId,
       },
     });
 
-    if (!key) {
-      throw new NotFoundException('API key not found');
-    }
+  if (!key) {
+    throw new NotFoundException(
+      'API key not found',
+    );
+  }
 
-    if (key.revokedAt) {
-      return {
-        id: key.id,
-        enabled: false,
-        revokedAt: key.revokedAt,
-      };
-    }
+  if (key.revokedAt) {
+    return {
+      id: key.id,
+      enabled: false,
+      revokedAt: key.revokedAt,
+    };
+  }
 
-    const revokedAt = new Date();
+  const revokedAt = new Date();
 
-    const updated = await this.prisma.apiKey.update({
+  const updated =
+    await this.prisma.apiKey.update({
       where: {
         id,
       },
@@ -124,12 +132,12 @@ export class ApiKeysService {
       },
     });
 
-    return {
-      id: updated.id,
-      enabled: updated.enabled,
-      revokedAt: updated.revokedAt,
-    };
-  }
+  return {
+    id: updated.id,
+    enabled: updated.enabled,
+    revokedAt: updated.revokedAt,
+  };
+}
 
   async resolve(rawApiKey: string) {
     const keyHash = createHash('sha256').update(rawApiKey).digest('hex');
@@ -149,12 +157,14 @@ export class ApiKeysService {
     }
 
     if (
-      !key.enabled ||
-      key.revokedAt ||
-      (key.expiresAt && key.expiresAt <= new Date())
-    ) {
-      return null;
-    }
+  !key.enabled ||
+  key.revokedAt ||
+  key.business.status !== 'ACTIVE' ||
+  (key.expiresAt &&
+    key.expiresAt <= new Date())
+) {
+  return null;
+}
 
     await this.prisma.apiKey.update({
       where: {

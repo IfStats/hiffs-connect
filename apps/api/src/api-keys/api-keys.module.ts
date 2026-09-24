@@ -1,17 +1,32 @@
 import { Module } from '@nestjs/common';
 
+import { AuthModule } from '../auth/auth.module.js';
+import { AuthzModule } from '../authz/authz.module.js';
 import { PrismaModule } from '../prisma.module.js';
+
 import { ApiKeyGuard } from './api-key.guard.js';
 import { ApiKeysController } from './api-keys.controller.js';
 import { ApiKeysService } from './api-keys.service.js';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    AuthzModule,
+  ],
 
-  controllers: [ApiKeysController],
+  controllers: [
+    ApiKeysController,
+  ],
 
-  providers: [ApiKeysService, ApiKeyGuard],
+  providers: [
+    ApiKeysService,
+    ApiKeyGuard,
+  ],
 
-  exports: [ApiKeysService, ApiKeyGuard],
+  exports: [
+    ApiKeysService,
+    ApiKeyGuard,
+  ],
 })
 export class ApiKeysModule {}
