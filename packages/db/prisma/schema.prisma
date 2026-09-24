@@ -47,6 +47,20 @@ enum BusinessRole {
   VIEWER
 }
 
+enum WalletTransactionType {
+  TOP_UP
+  MESSAGE_DEBIT
+  REFUND
+  ADJUSTMENT
+}
+
+enum WalletTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
 enum PlatformRole {
   SUPER_ADMIN
   OPERATIONS
@@ -59,6 +73,13 @@ enum AccountStatus {
   ACTIVE
   SUSPENDED
   RESTRICTED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
 }
 
 model Business {
@@ -76,6 +97,7 @@ model Business {
   senderIdentities SenderIdentity[]
   memberships      BusinessMembership[]
   status           AccountStatus        @default(ACTIVE)
+  invitations      BusinessInvitation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -238,18 +260,38 @@ model MessageRoutingAttempt {
   @@index([createdAt])
 }
 
-enum WalletTransactionType {
-  TOP_UP
-  MESSAGE_DEBIT
-  REFUND
-  ADJUSTMENT
-}
+model BusinessInvitation {
+  id String @id @default(cuid())
 
-enum WalletTransactionStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REVERSED
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  email String
+  role  BusinessRole
+
+  tokenHash String @unique
+
+  status InvitationStatus @default(PENDING)
+
+  invitedByUserId String
+  invitedByUser   User @relation("BusinessInvitationInvitedBy", fields: [invitedByUserId], references: [id])
+
+  acceptedByUserId String?
+  acceptedByUser   User? @relation("BusinessInvitationAcceptedBy", fields: [acceptedByUserId], references: [id])
+
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([email])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([invitedByUserId])
+  @@index([acceptedByUserId])
 }
 
 model Wallet {
@@ -412,6 +454,8 @@ model User {
   memberships                 BusinessMembership[]
   walletTransactionsPerformed WalletTransaction[]  @relation("WalletTransactionPerformedBy")
   status                      AccountStatus        @default(ACTIVE)
+  invitationsSent BusinessInvitation[] @relation("BusinessInvitationInvitedBy")
+invitationsAccepted BusinessInvitation[] @relation("BusinessInvitationAcceptedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

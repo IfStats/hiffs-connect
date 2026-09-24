@@ -1,8 +1,22 @@
 import { Module } from '@nestjs/common';
+
+import { PrismaModule } from '../prisma.module.js';
+import { BusinessPermissionGuard } from './business-permission.guard.js';
 import { PlatformPermissionGuard } from './platform-permission.guard.js';
 
 @Module({
-  providers: [PlatformPermissionGuard],
-  exports: [PlatformPermissionGuard],
+  imports: [
+    PrismaModule,
+  ],
+
+  providers: [
+    PlatformPermissionGuard,
+    BusinessPermissionGuard,
+  ],
+
+  exports: [
+    PlatformPermissionGuard,
+    BusinessPermissionGuard,
+  ],
 })
 export class AuthzModule {}

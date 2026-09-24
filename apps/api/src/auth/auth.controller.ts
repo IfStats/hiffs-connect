@@ -1,8 +1,26 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
+import type {
+  Request,
+} from 'express';
+
+import { ApiAuthGuard } from './api-auth.guard.js';
+import type { AuthUser } from './auth-user.type.js';
+import { AcceptInvitationDto } from './dto/accept-invitation.dto.js';
 
 import { AuthService } from './auth.service.js';
 import { VerifyCredentialsDto } from './dto/verify-credentials.dto.js';
 import { SignupDto } from './dto/signup.dto.js';
+
+type AuthenticatedRequest = Request & {
+  user: AuthUser;
+};
 
 @Controller('auth')
 export class AuthController {
@@ -22,5 +40,20 @@ signup(
   dto: SignupDto,
 ) {
   return this.authService.signup(dto);
+}
+
+@Post('invitations/accept')
+@UseGuards(ApiAuthGuard)
+acceptInvitation(
+  @Body()
+  dto: AcceptInvitationDto,
+
+  @Req()
+  request: AuthenticatedRequest,
+) {
+  return this.authService.acceptInvitation(
+    request.user.id,
+    dto,
+  );
 }
 }

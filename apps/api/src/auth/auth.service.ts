@@ -1,8 +1,19 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+
+import {
+  createHash,
+} from 'node:crypto';
+
+import {
+  InvitationStatus,
+} from '@prisma/client';
+
+import { AcceptInvitationDto } from './dto/accept-invitation.dto.js';;
 
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
@@ -196,6 +207,189 @@ export class AuthService {
     },
 
     accessToken,
+  };
+}
+
+async acceptInvitation(
+  userId: string,
+  dto: AcceptInvitationDto,
+) {
+  const tokenHash =
+    createHash('sha256')
+      .update(dto.token)
+      .digest('hex');
+
+  const invitation =
+    await this.prisma.businessInvitation.findUnique({
+      where: {
+        tokenHash,
+      },
+
+      include: {
+        business: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+  if (!invitation) {
+    throw new BadRequestException(
+      'Invitation is invalid',
+    );
+  }
+
+  if (
+    invitation.status !==
+    InvitationStatus.PENDING
+  ) {
+    throw new BadRequestException(
+      'Invitation is no longer active',
+    );
+  }
+
+  if (
+    invitation.expiresAt.getTime() <=
+    Date.now()
+  ) {
+    await this.prisma.businessInvitation.update({
+      where: {
+        id: invitation.id,
+      },
+
+      data: {
+        status:
+          InvitationStatus.EXPIRED,
+      },
+    });
+
+    throw new BadRequestException(
+      'Invitation has expired',
+    );
+  }
+
+  if (
+    invitation.business.status !==
+    'ACTIVE'
+  ) {
+    throw new BadRequestException(
+      'Business account is not active',
+    );
+  }
+
+  const user =
+    await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+
+      select: {
+        id: true,
+        email: true,
+        status: true,
+      },
+    });
+
+  if (!user) {
+    throw new UnauthorizedException(
+      'User account not found',
+    );
+  }
+
+  if (user.status !== 'ACTIVE') {
+    throw new UnauthorizedException(
+      'Account access is unavailable',
+    );
+  }
+
+  if (
+    user.email.toLowerCase() !==
+    invitation.email.toLowerCase()
+  ) {
+    throw new BadRequestException(
+      'Invitation email does not match authenticated user',
+    );
+  }
+
+  const existingMembership =
+    await this.prisma.businessMembership.findUnique({
+      where: {
+        userId_businessId: {
+          userId,
+          businessId:
+            invitation.businessId,
+        },
+      },
+    });
+
+  if (existingMembership) {
+    throw new ConflictException(
+      'User is already a member of this business',
+    );
+  }
+
+  const result =
+    await this.prisma.$transaction(
+      async (tx) => {
+        const membership =
+          await tx.businessMembership.create({
+            data: {
+              userId,
+              businessId:
+                invitation.businessId,
+              role:
+                invitation.role,
+              active: true,
+            },
+
+            select: {
+              id: true,
+              businessId: true,
+              role: true,
+              active: true,
+              createdAt: true,
+            },
+          });
+
+        await tx.businessInvitation.update({
+          where: {
+            id: invitation.id,
+          },
+
+          data: {
+            status:
+              InvitationStatus.ACCEPTED,
+
+            acceptedByUserId:
+              userId,
+
+            acceptedAt:
+              new Date(),
+          },
+        });
+
+        return membership;
+      },
+
+      {
+        maxWait: 10000,
+        timeout: 20000,
+      },
+    );
+
+  return {
+    business: {
+      id:
+        invitation.business.id,
+      name:
+        invitation.business.name,
+    },
+
+    membership:
+      result,
   };
 }
 }
