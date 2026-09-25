@@ -37,6 +37,27 @@ export class MessagingController {
     );
   }
 
+  @Post('business/:businessId/sms')
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(
+  Permission.MESSAGE_SEND,
+)
+sendBusinessSms(
+  @Param('businessId')
+  businessId: string,
+
+  @Body()
+  dto: SendSmsDto,
+) {
+  return this.messagingService.sendSms(
+    dto,
+    businessId,
+  );
+}
+
   @Get('business/:businessId/messages')
 @UseGuards(
   ApiAuthGuard,

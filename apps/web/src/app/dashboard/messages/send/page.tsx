@@ -1,6 +1,100 @@
 import Link from "next/link";
+import {
+  getServerSession,
+} from "next-auth";
+import { redirect } from "next/navigation";
 
-export default function SendMessagePage() {
+import { authOptions } from "@/auth";
+
+import {
+  SendSmsForm,
+} from "./components/send-sms-form";
+
+type SenderRegistration = {
+  id: string;
+  channel: string;
+  senderValue: string;
+  countryCode: string;
+  destinationCountry:
+    | string
+    | null;
+  status: string;
+};
+
+export default async function SendMessagePage() {
+  const session =
+    await getServerSession(
+      authOptions,
+    );
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const businessId =
+    session.user.businessId;
+
+  const accessToken =
+    session.user.accessToken;
+
+  if (
+    !businessId ||
+    !accessToken
+  ) {
+    redirect("/dashboard");
+  }
+
+  const apiUrl =
+    process.env.HIFFS_API_URL ??
+    "http://localhost:4000";
+
+  const response =
+    await fetch(
+      `${apiUrl}/sender-registrations/business/${businessId}`,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache: "no-store",
+      },
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      "Unable to load sender registrations",
+    );
+  }
+
+  const registrations =
+    (await response.json()) as SenderRegistration[];
+
+  const senders =
+    registrations
+      .filter(
+        (registration) =>
+          registration.channel ===
+            "SMS" &&
+          registration.status ===
+            "APPROVED",
+      )
+      .map(
+        (registration) => ({
+          id:
+            registration.id,
+
+          senderValue:
+            registration.senderValue,
+
+          countryCode:
+            registration.countryCode,
+
+          destinationCountry:
+            registration.destinationCountry,
+        }),
+      );
+
   return (
     <div className="mx-auto max-w-5xl space-y-8">
       <section>
@@ -20,100 +114,23 @@ export default function SendMessagePage() {
         </h1>
 
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-          Compose and send a transactional SMS through your approved sender
-          identity.
+          Send a transactional SMS
+          through an approved Hiffs
+          Connect sender identity.
         </p>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section className="rounded-2xl border border-slate-200 bg-white p-6">
-          <form className="space-y-6">
-            <div>
-              <label
-                htmlFor="sender"
-                className="mb-2 block text-sm font-medium"
-              >
-                Sender
-              </label>
-
-              <select
-                id="sender"
-                name="senderRegistrationId"
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-slate-400"
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  Select approved sender
-                </option>
-              </select>
-
-              <p className="mt-2 text-xs text-slate-500">
-                Only approved sender identities can be used for delivery.
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="recipient"
-                className="mb-2 block text-sm font-medium"
-              >
-                Recipient
-              </label>
-
-              <input
-                id="recipient"
-                name="to"
-                type="tel"
-                placeholder="+233XXXXXXXXX"
-                className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-slate-400"
-              />
-
-              <p className="mt-2 text-xs text-slate-500">
-                Use international E.164 format.
-              </p>
-            </div>
-
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label
-                  htmlFor="message"
-                  className="text-sm font-medium"
-                >
-                  Message
-                </label>
-
-                <span className="text-xs text-slate-400">
-                  0 / 1600
-                </span>
-              </div>
-
-              <textarea
-                id="message"
-                name="text"
-                rows={8}
-                maxLength={1600}
-                placeholder="Enter your message..."
-                className="w-full resize-none rounded-xl border border-slate-200 p-4 text-sm outline-none focus:border-slate-400"
-              />
-            </div>
-
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
-              <Link
-                href="/dashboard/messages"
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 px-5 text-sm font-medium"
-              >
-                Cancel
-              </Link>
-
-              <button
-                type="submit"
-                disabled
-                className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-950 px-6 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Send message
-              </button>
-            </div>
-          </form>
+          <SendSmsForm
+            businessId={
+              businessId
+            }
+            accessToken={
+              accessToken
+            }
+            senders={senders}
+          />
         </section>
 
         <aside className="space-y-4">
@@ -127,6 +144,7 @@ export default function SendMessagePage() {
                 <dt className="text-slate-500">
                   Channel
                 </dt>
+
                 <dd className="font-medium">
                   SMS
                 </dd>
@@ -136,6 +154,7 @@ export default function SendMessagePage() {
                 <dt className="text-slate-500">
                   Provider
                 </dt>
+
                 <dd className="font-medium">
                   Automatic routing
                 </dd>
@@ -143,10 +162,11 @@ export default function SendMessagePage() {
 
               <div className="flex justify-between gap-4">
                 <dt className="text-slate-500">
-                  Sender status
+                  Approved senders
                 </dt>
+
                 <dd className="font-medium">
-                  Required
+                  {senders.length}
                 </dd>
               </div>
             </dl>
@@ -154,12 +174,16 @@ export default function SendMessagePage() {
 
           <article className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
             <p className="text-sm font-semibold text-blue-950">
-              Secure sending
+              Segment billing
             </p>
 
             <p className="mt-2 text-sm leading-6 text-blue-800">
-              Message submission will be handled server-side so API
-              credentials are never exposed to the browser.
+              Wallet charges are based
+              on billable SMS pages,
+              not simply message count.
+              Longer or Unicode messages
+              may consume multiple SMS
+              pages.
             </p>
           </article>
         </aside>

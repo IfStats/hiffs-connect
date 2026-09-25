@@ -1,0 +1,57 @@
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsEmail,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
+
+import { Type } from 'class-transformer';
+
+export class ImportContactRowDto {
+  @IsString()
+  @Matches(/^\+[1-9]\d{7,14}$/, {
+    message:
+      'phone must be a valid international number, e.g. +233XXXXXXXXX',
+  })
+  phone!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  displayName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  source?: string;
+}
+
+export class ImportContactsDto {
+  @IsArray()
+  @ArrayMaxSize(5000)
+  @ValidateNested({
+    each: true,
+  })
+  @Type(
+    () => ImportContactRowDto,
+  )
+  contacts!: ImportContactRowDto[];
+}

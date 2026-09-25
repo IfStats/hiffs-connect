@@ -18,6 +18,10 @@ export enum Permission {
   WALLET_ADMIN_CREDIT = 'wallet.admin_credit',
   WALLET_ADMIN_DEBIT = 'wallet.admin_debit',
   WALLET_ADMIN_REFUND = 'wallet.admin_refund',
+  
+  CONTACT_READ = 'contact.read',
+ CONTACT_MANAGE = 'contact.manage',
+ CONTACT_IMPORT = 'contact.import',
 
   MESSAGE_READ = 'message.read',
   MESSAGE_SEND = 'message.send',

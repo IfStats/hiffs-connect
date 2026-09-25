@@ -10,6 +10,10 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.BUSINESS_UPDATE,
     Permission.BUSINESS_DELETE,
 
+    Permission.CONTACT_READ,
+    Permission.CONTACT_MANAGE,
+    Permission.CONTACT_IMPORT,
+
     Permission.MEMBER_READ,
     Permission.MEMBER_INVITE,
     Permission.MEMBER_UPDATE_ROLE,
@@ -39,6 +43,11 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
   [BusinessRole.ADMIN]: [
     Permission.BUSINESS_READ,
     Permission.BUSINESS_UPDATE,
+    
+
+    Permission.CONTACT_READ,
+    Permission.CONTACT_MANAGE,
+    Permission.CONTACT_IMPORT,
 
     Permission.MEMBER_READ,
     Permission.MEMBER_INVITE,
@@ -68,6 +77,8 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
 
   [BusinessRole.DEVELOPER]: [
     Permission.BUSINESS_READ,
+    
+    Permission.CONTACT_READ,
 
     Permission.MEMBER_READ,
 
@@ -100,6 +111,11 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.BUSINESS_READ,
 
     Permission.WALLET_READ,
+    
+
+    Permission.CONTACT_READ,
+    Permission.CONTACT_MANAGE,
+    Permission.CONTACT_IMPORT,
 
     Permission.MESSAGE_READ,
     Permission.MESSAGE_SEND,
@@ -114,7 +130,9 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
   [BusinessRole.VIEWER]: [
     Permission.BUSINESS_READ,
     Permission.MEMBER_READ,
-
+    
+    Permission.CONTACT_READ,
+    
     Permission.WALLET_READ,
     Permission.WALLET_TRANSACTION_READ,
 
@@ -140,7 +158,9 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<
 
     Permission.WALLET_READ,
     Permission.WALLET_TRANSACTION_READ,
-
+    
+    Permission.CONTACT_READ,
+    
     Permission.MESSAGE_READ,
 
     Permission.SENDER_READ,
@@ -170,6 +190,9 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<
 
     Permission.WALLET_READ,
     Permission.WALLET_TRANSACTION_READ,
+    
+
+    Permission.CONTACT_READ,
 
     Permission.MESSAGE_READ,
 

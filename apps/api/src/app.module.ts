@@ -13,6 +13,7 @@ import { ApiKeysModule } from './api-keys/api-keys.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AuthzModule } from './authz/authz.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { ContactsModule } from './contacts/contacts.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AdminModule } from './admin/admin.module.js';
     AuthModule,
     AuthzModule,
     AdminModule,
+    ContactsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -18,6 +18,8 @@ import { RouteMobileProvider } from './providers/routemobile.provider.js';
 import { MessagingProviderError } from './providers/provider-error.js';
 import { createHash } from 'node:crypto';
 
+import { calculateSmsUsage } from './sms-usage.js';
+
 @Injectable()
 export class MessagingService {
   private readonly logger = new Logger(MessagingService.name);
@@ -30,6 +32,9 @@ export class MessagingService {
 
   async sendSms(dto: SendSmsDto, authenticatedBusinessId: string) {
     const configuredProvider = process.env.MESSAGING_PROVIDER ?? 'mock';
+
+    const smsUsage =
+  calculateSmsUsage(dto.text);
 
     const senderRegistration = await this.prisma.senderRegistration.findUnique({
       where: {
@@ -66,6 +71,7 @@ export class MessagingService {
      * Resolve the normalized sender identity and determine which
      * providers are actually approved to use this sender.
      */
+
     const senderIdentity = await this.prisma.senderIdentity.findFirst({
       where: {
         businessId: senderRegistration.businessId,
@@ -214,6 +220,16 @@ export class MessagingService {
       );
     }
 
+     const providerCostTotal =
+       pricing.providerCost.mul(
+    smsUsage.segmentCount,
+  );
+
+   const customerPriceTotal =
+      pricing.retailPrice.mul(
+    smsUsage.segmentCount,
+  );
+
     const wallet = await this.prisma.wallet.findUnique({
       where: {
         businessId: senderRegistration.businessId,
@@ -230,7 +246,11 @@ export class MessagingService {
       );
     }
 
-    if (wallet.balance.lt(pricing.retailPrice)) {
+    if (
+  wallet.balance.lt(
+    customerPriceTotal,
+  )
+) {
       throw new BadRequestException('Insufficient wallet balance');
     }
 
@@ -255,13 +275,20 @@ export class MessagingService {
           );
         }
 
-        if (currentWallet.balance.lt(pricing.retailPrice)) {
+        if (
+  currentWallet.balance.lt(
+    customerPriceTotal,
+  )
+) {
           throw new BadRequestException('Insufficient wallet balance');
         }
 
         const balanceBefore = currentWallet.balance;
 
-        const balanceAfter = balanceBefore.minus(pricing.retailPrice);
+        const balanceAfter =
+  balanceBefore.minus(
+    customerPriceTotal,
+  );
 
         const createdMessage = await tx.message.create({
           data: {
@@ -285,9 +312,20 @@ export class MessagingService {
 
             destinationCountry: pricingCountryCode,
 
-            providerCost: pricing.providerCost,
+            characterCount:
+  smsUsage.characterCount,
 
-            customerPrice: pricing.retailPrice,
+segmentCount:
+  smsUsage.segmentCount,
+
+smsEncoding:
+  smsUsage.encoding,
+
+providerCost:
+  providerCostTotal,
+
+customerPrice:
+  customerPriceTotal,
 
             currency: pricing.currency,
           },
@@ -313,7 +351,7 @@ export class MessagingService {
 
             status: 'COMPLETED',
 
-            amount: pricing.retailPrice,
+            amount:customerPriceTotal,
 
             currency: pricing.currency,
 
@@ -323,7 +361,8 @@ export class MessagingService {
 
             reference: `sms-${createdMessage.id}`,
 
-            description: `SMS charge to ${dto.to}`,
+            description:
+  `SMS charge to ${dto.to} (${smsUsage.segmentCount} segment${smsUsage.segmentCount === 1 ? '' : 's'})`,
           },
         });
 
@@ -533,7 +572,10 @@ export class MessagingService {
             data: {
               provider: fallbackRule.provider,
 
-              providerCost: fallbackPricing.providerCost,
+              providerCost:
+  fallbackPricing.providerCost.mul(
+    smsUsage.segmentCount,
+  ),
             },
           });
         } catch (fallbackError) {
