@@ -10,10 +10,16 @@ import { CreateSenderRegistrationDto } from './dto/create-sender-registration.dt
 export class SenderRegistrationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateSenderRegistrationDto) {
-    const business = await this.prisma.business.findUnique({
-      where: { id: dto.businessId },
-    });
+  async create(
+  businessId: string,
+  dto: CreateSenderRegistrationDto,
+) {
+    const business =
+  await this.prisma.business.findUnique({
+    where: {
+      id: businessId,
+    },
+  });
 
     if (!business) {
       throw new BadRequestException('Business does not exist');
@@ -21,7 +27,7 @@ export class SenderRegistrationsService {
 
     return this.prisma.senderRegistration.create({
       data: {
-        businessId: dto.businessId,
+        businessId,
         channel: dto.channel,
         senderType: dto.senderType,
         senderValue: dto.senderValue,
@@ -38,16 +44,19 @@ export class SenderRegistrationsService {
     });
   }
 
-  findAll() {
-    return this.prisma.senderRegistration.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        business: true,
-      },
-    });
-  }
+  findByBusiness(
+  businessId: string,
+) {
+  return this.prisma.senderRegistration.findMany({
+    where: {
+      businessId,
+    },
+
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+}
 
   async findOne(id: string) {
     const registration = await this.prisma.senderRegistration.findUnique({
@@ -137,4 +146,27 @@ export class SenderRegistrationsService {
       },
     });
   }
+
+  async findOneForBusiness(
+  businessId: string,
+  id: string,
+) {
+  const registration =
+    await this.prisma.senderRegistration.findFirst({
+      where: {
+        id,
+        businessId,
+      },
+    });
+
+  if (!registration) {
+    throw new NotFoundException(
+      'Sender registration not found',
+    );
+  }
+
+  return registration;
 }
+}
+
+

@@ -18,9 +18,6 @@ export enum SenderTypeDto {
 }
 
 export class CreateSenderRegistrationDto {
-  @IsString()
-  @IsNotEmpty()
-  businessId!: string;
 
   @IsEnum(MessageChannelDto)
   channel!: MessageChannelDto;

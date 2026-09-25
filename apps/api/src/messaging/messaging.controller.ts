@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Res,
   Req,
   UseGuards,
@@ -14,9 +15,14 @@ import { ApiKeyGuard, type ApiKeyRequest } from '../api-keys/api-key.guard.js';
 import type { Response } from 'express';
 import { MessagingService } from './messaging.service.js';
 import { SendSmsDto } from './dto/send-sms.dto.js';
-import { DeliveryWebhookDto } from './dto/delivery-webhook.dto.js';
 import { InfobipDeliveryReportDto } from './dto/infobip-delivery-report.dto.js';
 import { RouteMobileDeliveryReportDto } from './dto/routemobile-delivery-report.dto.js';
+import { ApiAuthGuard } from '../auth/api-auth.guard.js';
+import { BusinessPermissionGuard } from '../authz/business-permission.guard.js';
+import { Permission } from '../authz/permission.enum.js';
+import { RequirePermissions } from '../authz/require-permissions.decorator.js';
+import { InfobipWebhookGuard } from './infobip-webhook.guard.js';
+import { RouteMobileWebhookGuard } from './routemobile-webhook.guard.js';
 
 @Controller('messaging')
 export class MessagingController {
@@ -31,35 +37,96 @@ export class MessagingController {
     );
   }
 
-  @Get('messages')
-  getMessages() {
-    return this.messagingService.getMessages();
-  }
+  @Get('business/:businessId/messages')
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(Permission.MESSAGE_READ)
+getMessages(
+  @Param('businessId')
+  businessId: string,
+) {
+  return this.messagingService.getMessages(
+    businessId,
+  );
+}
 
-  @Get('messages/:id')
-  getMessage(@Param('id') id: string) {
-    return this.messagingService.getMessage(id);
-  }
+@Get('business/:businessId/messages/:id')
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(Permission.MESSAGE_READ)
+getMessage(
+  @Param('businessId')
+  businessId: string,
 
-  @Get('reports/summary')
-  getSummary() {
-    return this.messagingService.getSummary();
-  }
+  @Param('id')
+  id: string,
+) {
+  return this.messagingService.getMessage(
+    businessId,
+    id,
+  );
+}
 
-  @Post('webhooks/delivery')
-  handleDeliveryWebhook(@Body() dto: DeliveryWebhookDto) {
-    return this.messagingService.handleDeliveryWebhook(dto);
-  }
+@Get('business/:businessId/reports/summary')
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(Permission.MESSAGE_READ)
+getSummary(
+  @Param('businessId')
+  businessId: string,
+) {
+  return this.messagingService.getSummary(
+    businessId,
+  );
+}
 
+@Get(
+  'business/:businessId/messages/:id/routing-attempts',
+)
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(Permission.MESSAGE_READ)
+getRoutingAttempts(
+  @Param('businessId')
+  businessId: string,
+
+  @Param('id')
+  id: string,
+) {
+  return this.messagingService.getRoutingAttempts(
+    businessId,
+    id,
+  );
+}
   @Post('webhooks/infobip')
-  handleInfobipDeliveryReport(@Body() dto: InfobipDeliveryReportDto) {
-    return this.messagingService.handleInfobipDeliveryReport(dto);
-  }
+@UseGuards(InfobipWebhookGuard)
+handleInfobipDeliveryReport(
+  @Body()
+  dto: InfobipDeliveryReportDto,
+) {
+  return this.messagingService.handleInfobipDeliveryReport(
+    dto,
+  );
+}
 
-  @Post('webhooks/routemobile')
-  handleRouteMobileDeliveryReport(@Body() dto: RouteMobileDeliveryReportDto) {
-    return this.messagingService.handleRouteMobileDeliveryReport(dto);
-  }
+  @Get('webhooks/routemobile')
+@UseGuards(RouteMobileWebhookGuard)
+handleRouteMobileDeliveryReport(
+  @Query()
+  dto: RouteMobileDeliveryReportDto,
+) {
+  return this.messagingService.handleRouteMobileDeliveryReport(
+    dto,
+  );
+}
 
   @Get('providers/routemobile/coverage-map')
   async downloadRouteMobileCoverageMap(@Res() res: Response) {
@@ -73,10 +140,5 @@ export class MessagingController {
     );
 
     res.send(file.data);
-  }
-
-  @Get('messages/:id/routing-attempts')
-  getRoutingAttempts(@Param('id') id: string) {
-    return this.messagingService.getRoutingAttempts(id);
   }
 }

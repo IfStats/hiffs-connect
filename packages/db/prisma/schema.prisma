@@ -217,6 +217,29 @@ model Message {
   @@index([createdAt])
 }
 
+model WebhookReceipt {
+  id String @id @default(cuid())
+
+  provider String
+  eventKey  String
+
+  providerMessageId String?
+  providerStatus    String?
+
+  payload Json
+
+  processedAt    DateTime?
+  processingError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, eventKey])
+  @@index([provider])
+  @@index([providerMessageId])
+  @@index([createdAt])
+}
+
 model ProviderRoutingRule {
   id          String         @id @default(cuid())
   countryCode String

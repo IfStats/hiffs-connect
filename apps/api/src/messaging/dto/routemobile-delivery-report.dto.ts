@@ -1,4 +1,8 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class RouteMobileDeliveryReportDto {
   @IsString()
@@ -11,6 +15,14 @@ export class RouteMobileDeliveryReportDto {
 
   @IsOptional()
   @IsString()
+  sSender?: string;
+
+  @IsOptional()
+  @IsString()
+  sMobileNo?: string;
+
+  @IsOptional()
+  @IsString()
   dtSubmit?: string;
 
   @IsOptional()
@@ -19,15 +31,11 @@ export class RouteMobileDeliveryReportDto {
 
   @IsOptional()
   @IsString()
-  sErrCode?: string;
+  iErrCode?: string;
 
   @IsOptional()
   @IsString()
   sError?: string;
-
-  @IsOptional()
-  @IsString()
-  sDestination?: string;
 
   @IsOptional()
   @IsString()
@@ -36,4 +44,20 @@ export class RouteMobileDeliveryReportDto {
   @IsOptional()
   @IsString()
   iCharge?: string;
+
+  @IsOptional()
+  @IsString()
+  iMCCMNC?: string;
+
+  @IsOptional()
+  @IsString()
+  sTagName?: string;
+
+  @IsOptional()
+  @IsString()
+  sUdf1?: string;
+
+  @IsOptional()
+  @IsString()
+  sUdf2?: string;
 }

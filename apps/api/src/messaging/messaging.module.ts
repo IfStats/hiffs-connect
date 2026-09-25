@@ -4,13 +4,21 @@ import { MessagingService } from './messaging.service.js';
 import { InfobipProvider } from './providers/infobip.provider.js';
 import { RouteMobileProvider } from './providers/routemobile.provider.js';
 import { ApiKeysModule } from '../api-keys/api-keys.module.js';
+import { InfobipWebhookGuard } from './infobip-webhook.guard.js';
+import { RouteMobileWebhookGuard } from './routemobile-webhook.guard.js';
 
 @Module({
   imports: [ApiKeysModule],
 
   controllers: [MessagingController],
 
-  providers: [MessagingService, InfobipProvider, RouteMobileProvider],
+  providers: [
+  MessagingService,
+  InfobipProvider,
+  RouteMobileProvider,
+  InfobipWebhookGuard,
+  RouteMobileWebhookGuard,
+],
 
   exports: [MessagingService],
 })

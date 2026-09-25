@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { authOptions } from '@/auth';
 import { DashboardNav } from '@/components/dashboard-nav';
+import { SignOutButton } from '@/components/sign-out-button';
 
 export default async function DashboardLayout({
   children,
@@ -73,6 +74,9 @@ export default async function DashboardLayout({
                   'Member'}
               </div>
             </div>
+            <div className="mt-3">
+  <SignOutButton />
+</div>
           </div>
         </aside>
 

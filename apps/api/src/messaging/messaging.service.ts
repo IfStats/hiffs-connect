@@ -10,13 +10,13 @@ import {
 import { PrismaService } from '../prisma.service.js';
 
 import { SendSmsDto } from './dto/send-sms.dto.js';
-import { DeliveryWebhookDto } from './dto/delivery-webhook.dto.js';
 import { InfobipDeliveryReportDto } from './dto/infobip-delivery-report.dto.js';
 import { RouteMobileDeliveryReportDto } from './dto/routemobile-delivery-report.dto.js';
 
 import { InfobipProvider } from './providers/infobip.provider.js';
 import { RouteMobileProvider } from './providers/routemobile.provider.js';
 import { MessagingProviderError } from './providers/provider-error.js';
+import { createHash } from 'node:crypto';
 
 @Injectable()
 export class MessagingService {
@@ -825,8 +825,11 @@ export class MessagingService {
     }
 
     if (provider === 'infobip') {
-      return this.infobipProvider.sendSms(dto);
-    }
+  return this.infobipProvider.sendSms(
+    dto,
+    sender,
+  );
+}
 
     if (provider === 'routemobile') {
       return this.routeMobileProvider.sendSms(dto, sender);
@@ -837,42 +840,57 @@ export class MessagingService {
     );
   }
 
-  async getMessages() {
-    return this.prisma.message.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
+  async getMessages(
+  businessId: string,
+) {
+  return this.prisma.message.findMany({
+    where: {
+      businessId,
+    },
 
-      take: 100,
-    });
-  }
+    orderBy: {
+      createdAt: 'desc',
+    },
 
-  async getMessage(id: string) {
-    return this.prisma.message.findUnique({
-      where: {
-        id,
-      },
+    take: 100,
+  });
+}
 
-      include: {
-        routingAttempts: {
-          orderBy: {
-            attemptNumber: 'asc',
-          },
+  async getMessage(
+  businessId: string,
+  id: string,
+) {
+  return this.prisma.message.findFirst({
+    where: {
+      id,
+      businessId,
+    },
+
+    include: {
+      routingAttempts: {
+        orderBy: {
+          attemptNumber: 'asc',
         },
+      },
 
-        walletTransactions: {
-          orderBy: {
-            createdAt: 'asc',
-          },
+      walletTransactions: {
+        orderBy: {
+          createdAt: 'asc',
         },
       },
-    });
-  }
+    },
+  });
+}
 
-  async getRoutingAttempts(messageId: string) {
-    const message = await this.prisma.message.findUnique({
+  async getRoutingAttempts(
+  businessId: string,
+  messageId: string,
+) {
+  const message =
+    await this.prisma.message.findFirst({
       where: {
         id: messageId,
+        businessId,
       },
 
       select: {
@@ -880,24 +898,31 @@ export class MessagingService {
       },
     });
 
-    if (!message) {
-      throw new BadRequestException('Message not found');
-    }
-
-    return this.prisma.messageRoutingAttempt.findMany({
-      where: {
-        messageId,
-      },
-
-      orderBy: {
-        attemptNumber: 'asc',
-      },
-    });
+  if (!message) {
+    throw new BadRequestException(
+      'Message not found',
+    );
   }
 
-  async getSummary() {
-    const messages = await this.prisma.message.findMany({
+  return this.prisma.messageRoutingAttempt.findMany({
+    where: {
+      messageId,
+    },
+
+    orderBy: {
+      attemptNumber: 'asc',
+    },
+  });
+}
+
+  async getSummary(
+  businessId: string,
+) {
+  const messages =
+    await this.prisma.message.findMany({
       where: {
+        businessId,
+
         providerCost: {
           not: null,
         },
@@ -909,119 +934,146 @@ export class MessagingService {
 
       select: {
         providerCost: true,
-
         customerPrice: true,
-
         currency: true,
-
         status: true,
       },
     });
 
-    let providerCostTotal = new Prisma.Decimal(0);
+  let providerCostTotal =
+    new Prisma.Decimal(0);
 
-    let customerRevenueTotal = new Prisma.Decimal(0);
+  let customerRevenueTotal =
+    new Prisma.Decimal(0);
 
-    for (const message of messages) {
-      if (message.providerCost) {
-        providerCostTotal = providerCostTotal.plus(message.providerCost);
-      }
-
-      if (message.customerPrice) {
-        customerRevenueTotal = customerRevenueTotal.plus(message.customerPrice);
-      }
+  for (const message of messages) {
+    if (message.providerCost) {
+      providerCostTotal =
+        providerCostTotal.plus(
+          message.providerCost,
+        );
     }
 
-    const grossMargin = customerRevenueTotal.minus(providerCostTotal);
-
-    const grossMarginPercent = customerRevenueTotal.gt(0)
-      ? grossMargin.div(customerRevenueTotal).mul(100)
-      : new Prisma.Decimal(0);
-
-    return {
-      messageCount: messages.length,
-
-      providerCostTotal: providerCostTotal.toFixed(6),
-
-      customerRevenueTotal: customerRevenueTotal.toFixed(6),
-
-      grossMargin: grossMargin.toFixed(6),
-
-      grossMarginPercent: grossMarginPercent.toFixed(2),
-    };
+    if (message.customerPrice) {
+      customerRevenueTotal =
+        customerRevenueTotal.plus(
+          message.customerPrice,
+        );
+    }
   }
 
-  async handleDeliveryWebhook(dto: DeliveryWebhookDto) {
-    const message = await this.prisma.message.findFirst({
-      where: {
-        providerMessageId: dto.providerMessageId,
-      },
-    });
+  const grossMargin =
+    customerRevenueTotal.minus(
+      providerCostTotal,
+    );
 
-    if (!message) {
-      throw new BadRequestException('Message not found for providerMessageId');
-    }
+  const grossMarginPercent =
+    customerRevenueTotal.gt(0)
+      ? grossMargin
+          .div(customerRevenueTotal)
+          .mul(100)
+      : new Prisma.Decimal(0);
 
-    const normalizedStatus = dto.status.toUpperCase();
+  return {
+    messageCount: messages.length,
 
-    if (!['SENT', 'DELIVERED', 'FAILED'].includes(normalizedStatus)) {
-      throw new BadRequestException(
-        `Unsupported delivery status: ${dto.status}`,
+    providerCostTotal:
+      providerCostTotal.toFixed(6),
+
+    customerRevenueTotal:
+      customerRevenueTotal.toFixed(6),
+
+    grossMargin:
+      grossMargin.toFixed(6),
+
+    grossMarginPercent:
+      grossMarginPercent.toFixed(2),
+  };
+}
+
+  async handleInfobipDeliveryReport(
+  dto: InfobipDeliveryReportDto,
+) {
+  const updates = [];
+
+  for (const result of dto.results) {
+    const providerStatus =
+      result.status.groupName.toUpperCase();
+
+    const eventKey = this.webhookEventKey(
+      'infobip',
+      [
+        result.messageId,
+        result.status.id,
+        result.status.groupId,
+        result.status.name,
+        result.doneAt,
+        result.error?.id,
+      ],
+    );
+
+    const receiptResult =
+      await this.createWebhookReceipt(
+        'infobip',
+        eventKey,
+        result.messageId,
+        providerStatus,
+        result as unknown as Prisma.InputJsonValue,
+      );
+
+    const receipt = receiptResult.receipt;
+
+    if (!receipt) {
+      throw new InternalServerErrorException(
+        'Unable to resolve Infobip webhook receipt',
       );
     }
 
-    if (message.status === 'DELIVERED' && normalizedStatus !== 'DELIVERED') {
-      throw new BadRequestException('Delivered message cannot move backwards');
-    }
-
-    const now = new Date();
-
-    return this.prisma.message.update({
-      where: {
-        id: message.id,
-      },
-
-      data: {
-        status: normalizedStatus as 'SENT' | 'DELIVERED' | 'FAILED',
-
-        sentAt: normalizedStatus === 'SENT' ? now : message.sentAt,
-
-        deliveredAt:
-          normalizedStatus === 'DELIVERED' ? now : message.deliveredAt,
-
-        failureReason:
-          normalizedStatus === 'FAILED'
-            ? (dto.failureReason ?? 'Provider reported delivery failure')
-            : null,
-      },
-    });
-  }
-
-  async handleInfobipDeliveryReport(dto: InfobipDeliveryReportDto) {
-    const updates = [];
-
-    for (const result of dto.results) {
-      const message = await this.prisma.message.findFirst({
-        where: {
-          providerMessageId: result.messageId,
-        },
+    /*
+     * If this exact provider event was already processed,
+     * acknowledge it without changing message state again.
+     */
+    if (
+      receiptResult.duplicate &&
+      receipt.processedAt
+    ) {
+      updates.push({
+        messageId: result.messageId,
+        status: 'DUPLICATE',
       });
 
+      continue;
+    }
+
+    try {
+      const message =
+        await this.prisma.message.findFirst({
+          where: {
+            providerMessageId:
+              result.messageId,
+
+            provider: 'infobip',
+          },
+        });
+
       if (!message) {
+        await this.completeWebhookReceipt(
+          receipt.id,
+        );
+
         updates.push({
           messageId: result.messageId,
-
           status: 'IGNORED',
-
           reason: 'Message not found',
         });
 
         continue;
       }
 
-      const providerStatus = result.status.groupName.toUpperCase();
-
-      let internalStatus: 'SENT' | 'DELIVERED' | 'FAILED';
+      let internalStatus:
+        | 'SENT'
+        | 'DELIVERED'
+        | 'FAILED';
 
       switch (providerStatus) {
         case 'PENDING':
@@ -1039,23 +1091,36 @@ export class MessagingService {
           break;
 
         default:
+          await this.completeWebhookReceipt(
+            receipt.id,
+          );
+
           updates.push({
             messageId: result.messageId,
-
             status: 'IGNORED',
-
-            reason: `Unsupported Infobip status: ${providerStatus}`,
+            reason:
+              `Unsupported Infobip status: ${providerStatus}`,
           });
 
           continue;
       }
 
-      if (message.status === 'DELIVERED' || message.status === internalStatus) {
+      /*
+       * DELIVERED is terminal for our current SMS state
+       * machine. A delayed provider callback cannot move
+       * the message backwards.
+       */
+      if (
+        message.status === 'DELIVERED' ||
+        message.status === internalStatus
+      ) {
+        await this.completeWebhookReceipt(
+          receipt.id,
+        );
+
         updates.push({
           messageId: result.messageId,
-
           status: 'UNCHANGED',
-
           currentStatus: message.status,
         });
 
@@ -1063,82 +1128,174 @@ export class MessagingService {
       }
 
       const sentAt =
-        result.sentAt && !Number.isNaN(Date.parse(result.sentAt))
+        result.sentAt &&
+        !Number.isNaN(
+          Date.parse(result.sentAt),
+        )
           ? new Date(result.sentAt)
           : undefined;
 
       const deliveredAt =
         internalStatus === 'DELIVERED' &&
         result.doneAt &&
-        !Number.isNaN(Date.parse(result.doneAt))
+        !Number.isNaN(
+          Date.parse(result.doneAt),
+        )
           ? new Date(result.doneAt)
           : undefined;
 
       const failureReason =
         internalStatus === 'FAILED'
-          ? (result.error?.description ??
-            result.status.description ??
-            'Infobip reported delivery failure')
+          ? (
+              result.error?.description ??
+              result.status.description ??
+              'Infobip reported delivery failure'
+            )
           : null;
 
-      const updated = await this.prisma.message.update({
-        where: {
-          id: message.id,
-        },
+      const updated =
+        await this.prisma.message.update({
+          where: {
+            id: message.id,
+          },
 
-        data: {
-          status: internalStatus,
+          data: {
+            status: internalStatus,
 
-          sentAt:
-            internalStatus === 'SENT' || internalStatus === 'DELIVERED'
-              ? (sentAt ?? message.sentAt ?? new Date())
-              : message.sentAt,
+            sentAt:
+              internalStatus === 'SENT' ||
+              internalStatus === 'DELIVERED'
+                ? (
+                    sentAt ??
+                    message.sentAt ??
+                    new Date()
+                  )
+                : message.sentAt,
 
-          deliveredAt:
-            internalStatus === 'DELIVERED'
-              ? (deliveredAt ?? new Date())
-              : message.deliveredAt,
+            deliveredAt:
+              internalStatus === 'DELIVERED'
+                ? (
+                    deliveredAt ??
+                    message.deliveredAt ??
+                    new Date()
+                  )
+                : message.deliveredAt,
 
-          failureReason,
-        },
-      });
+            failureReason,
+          },
+        });
+
+      await this.completeWebhookReceipt(
+        receipt.id,
+      );
 
       updates.push({
         messageId: result.messageId,
-
         status: 'UPDATED',
-
         internalStatus: updated.status,
       });
+    } catch (error) {
+      try {
+        await this.failWebhookReceipt(
+          receipt.id,
+          error,
+        );
+      } catch (receiptError) {
+        this.logger.error(
+          `Failed to record Infobip webhook processing error for receipt ${receipt.id}`,
+          receiptError instanceof Error
+            ? receiptError.stack
+            : String(receiptError),
+        );
+      }
+
+      throw error;
     }
+  }
 
+  return {
+    processed: dto.results.length,
+    updates,
+  };
+}
+
+ async handleRouteMobileDeliveryReport(
+  dto: RouteMobileDeliveryReportDto,
+) {
+  const providerStatus =
+    dto.sStatus.trim().toUpperCase();
+
+  const eventKey = this.webhookEventKey(
+    'routemobile',
+    [
+      dto.sMessageId,
+      providerStatus,
+      dto.dtSubmit,
+      dto.dtDone,
+      dto.iErrCode,
+      dto.iCharge,
+    ],
+  );
+
+  const receiptResult =
+    await this.createWebhookReceipt(
+      'routemobile',
+      eventKey,
+      dto.sMessageId,
+      providerStatus,
+      dto as unknown as Prisma.InputJsonValue,
+    );
+
+  const receipt = receiptResult.receipt;
+
+  if (!receipt) {
+    throw new InternalServerErrorException(
+      'Unable to resolve Route Mobile webhook receipt',
+    );
+  }
+
+  /*
+   * An exact Route Mobile retry that has already been
+   * successfully processed is acknowledged without
+   * touching the Message record again.
+   */
+  if (
+    receiptResult.duplicate &&
+    receipt.processedAt
+  ) {
     return {
-      processed: dto.results.length,
-
-      updates,
+      messageId: dto.sMessageId,
+      status: 'DUPLICATE',
     };
   }
 
-  async handleRouteMobileDeliveryReport(dto: RouteMobileDeliveryReportDto) {
-    const message = await this.prisma.message.findFirst({
-      where: {
-        providerMessageId: dto.sMessageId,
-      },
-    });
+  try {
+    const message =
+      await this.prisma.message.findFirst({
+        where: {
+          providerMessageId:
+            dto.sMessageId,
+
+          provider: 'routemobile',
+        },
+      });
 
     if (!message) {
+      await this.completeWebhookReceipt(
+        receipt.id,
+      );
+
       return {
         messageId: dto.sMessageId,
-
         status: 'IGNORED',
-
         reason: 'Message not found',
       };
     }
 
-    const providerStatus = dto.sStatus.trim().toUpperCase();
-
-    let internalStatus: 'SENT' | 'DELIVERED' | 'FAILED';
+    let internalStatus:
+      | 'SENT'
+      | 'DELIVERED'
+      | 'FAILED';
 
     switch (providerStatus) {
       case 'ACCEPTED':
@@ -1162,76 +1319,231 @@ export class MessagingService {
         break;
 
       default:
+        await this.completeWebhookReceipt(
+          receipt.id,
+        );
+
         return {
           messageId: dto.sMessageId,
-
           status: 'IGNORED',
-
-          reason: `Unsupported Route Mobile status: ${providerStatus}`,
+          reason:
+            `Unsupported Route Mobile status: ${providerStatus}`,
         };
     }
 
-    if (message.status === internalStatus || message.status === 'DELIVERED') {
+    /*
+     * DELIVERED is terminal for our current state machine.
+     * Late or duplicate DLRs must not move a delivered
+     * message backwards.
+     */
+    if (
+      message.status ===
+        internalStatus ||
+      message.status ===
+        'DELIVERED'
+    ) {
+      await this.completeWebhookReceipt(
+        receipt.id,
+      );
+
       return {
         messageId: dto.sMessageId,
-
         status: 'UNCHANGED',
-
         currentStatus: message.status,
       };
     }
 
-    const parseDate = (value?: string): Date | undefined => {
+    const parseDate = (
+      value?: string,
+    ): Date | undefined => {
       if (!value) {
         return undefined;
       }
 
-      const timestamp = Date.parse(value);
+      const timestamp =
+        Date.parse(value);
 
-      return Number.isNaN(timestamp) ? undefined : new Date(timestamp);
+      return Number.isNaN(timestamp)
+        ? undefined
+        : new Date(timestamp);
     };
 
-    const sentAt = parseDate(dto.dtSubmit);
+    const sentAt =
+      parseDate(dto.dtSubmit);
 
-    const deliveredAt = parseDate(dto.dtDone);
+    const deliveredAt =
+      parseDate(dto.dtDone);
 
-    const updated = await this.prisma.message.update({
-      where: {
-        id: message.id,
-      },
+    const updated =
+      await this.prisma.message.update({
+        where: {
+          id: message.id,
+        },
 
-      data: {
-        status: internalStatus,
+        data: {
+          status: internalStatus,
 
-        sentAt:
-          internalStatus === 'SENT' || internalStatus === 'DELIVERED'
-            ? (sentAt ?? message.sentAt ?? new Date())
-            : message.sentAt,
+          sentAt:
+            internalStatus === 'SENT' ||
+            internalStatus === 'DELIVERED'
+              ? (
+                  sentAt ??
+                  message.sentAt ??
+                  new Date()
+                )
+              : message.sentAt,
 
-        deliveredAt:
-          internalStatus === 'DELIVERED'
-            ? (deliveredAt ?? message.deliveredAt ?? new Date())
-            : message.deliveredAt,
+          deliveredAt:
+            internalStatus ===
+            'DELIVERED'
+              ? (
+                  deliveredAt ??
+                  message.deliveredAt ??
+                  new Date()
+                )
+              : message.deliveredAt,
 
-        failureReason:
-          internalStatus === 'FAILED'
-            ? (dto.sError ??
-              dto.sErrCode ??
-              `Route Mobile status: ${providerStatus}`)
-            : null,
-      },
-    });
+          failureReason:
+            internalStatus === 'FAILED'
+              ? (
+                  dto.sError ??
+                  dto.iErrCode ??
+                  `Route Mobile status: ${providerStatus}`
+                )
+              : null,
+        },
+      });
+
+    await this.completeWebhookReceipt(
+      receipt.id,
+    );
 
     return {
       messageId: dto.sMessageId,
-
       status: 'UPDATED',
-
       internalStatus: updated.status,
     };
-  }
+  } catch (error) {
+    try {
+      await this.failWebhookReceipt(
+        receipt.id,
+        error,
+      );
+    } catch (receiptError) {
+      this.logger.error(
+        `Failed to record Route Mobile webhook processing error for receipt ${receipt.id}`,
+        receiptError instanceof Error
+          ? receiptError.stack
+          : String(receiptError),
+      );
+    }
 
+    throw error;
+  }
+}
   async downloadRouteMobileCoverageMap() {
     return this.routeMobileProvider.downloadCoverageMap();
   }
+
+  private webhookEventKey(
+  provider: string,
+  parts: Array<
+    string | number | null | undefined
+  >,
+) {
+  return createHash('sha256')
+    .update(
+      [
+        provider,
+        ...parts.map(
+          (part) => String(part ?? ''),
+        ),
+      ].join('|'),
+    )
+    .digest('hex');
+}
+
+private async createWebhookReceipt(
+  provider: string,
+  eventKey: string,
+  providerMessageId: string,
+  providerStatus: string,
+  payload: Prisma.InputJsonValue,
+) {
+  try {
+    const receipt =
+      await this.prisma.webhookReceipt.create({
+        data: {
+          provider,
+          eventKey,
+          providerMessageId,
+          providerStatus,
+          payload,
+        },
+      });
+
+    return {
+      duplicate: false,
+      receipt,
+    };
+  } catch (error) {
+    if (
+      error instanceof
+        Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      const receipt =
+        await this.prisma.webhookReceipt.findUnique({
+          where: {
+            provider_eventKey: {
+              provider,
+              eventKey,
+            },
+          },
+        });
+
+      return {
+        duplicate: true,
+        receipt,
+      };
+    }
+
+    throw error;
+  }
+}
+
+private async completeWebhookReceipt(
+  id: string,
+) {
+  await this.prisma.webhookReceipt.update({
+    where: {
+      id,
+    },
+
+    data: {
+      processedAt: new Date(),
+      processingError: null,
+    },
+  });
+}
+
+private async failWebhookReceipt(
+  id: string,
+  error: unknown,
+) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error);
+
+  await this.prisma.webhookReceipt.update({
+    where: {
+      id,
+    },
+
+    data: {
+      processingError: message,
+    },
+  });
+}
 }

@@ -1,48 +1,50 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
+
+import { ApiAuthGuard } from '../auth/api-auth.guard.js';
+import { BusinessPermissionGuard } from '../authz/business-permission.guard.js';
+import { Permission } from '../authz/permission.enum.js';
+import { RequirePermissions } from '../authz/require-permissions.decorator.js';
 
 import { WalletsService } from './wallets.service.js';
-import { TopUpWalletDto } from './dto/top-up-wallet.dto.js';
-import { AdjustWalletDto } from './dto/adjust-wallet.dto.js';
 
 @Controller('wallets')
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
 export class WalletsController {
-  constructor(private readonly walletsService: WalletsService) {}
+  constructor(
+    private readonly walletsService: WalletsService,
+  ) {}
 
   @Get(':businessId')
+  @RequirePermissions(
+    Permission.WALLET_READ,
+  )
   getWallet(
     @Param('businessId')
     businessId: string,
   ) {
-    return this.walletsService.getWallet(businessId);
-  }
-
-  @Post(':businessId/top-up')
-  topUp(
-    @Param('businessId')
-    businessId: string,
-
-    @Body()
-    dto: TopUpWalletDto,
-  ) {
-    return this.walletsService.topUp(businessId, dto);
-  }
-
-  @Post(':businessId/adjust')
-  adjust(
-    @Param('businessId')
-    businessId: string,
-
-    @Body()
-    dto: AdjustWalletDto,
-  ) {
-    return this.walletsService.adjust(businessId, dto);
+    return this.walletsService.getWallet(
+      businessId,
+    );
   }
 
   @Get(':businessId/transactions')
+  @RequirePermissions(
+    Permission.WALLET_TRANSACTION_READ,
+  )
   getTransactions(
     @Param('businessId')
     businessId: string,
   ) {
-    return this.walletsService.getTransactions(businessId);
+    return this.walletsService.getTransactions(
+      businessId,
+    );
   }
 }
