@@ -131,6 +131,10 @@ export default async function DashboardLayout({
                     .slice(0, 1)
                     .toUpperCase()}
                 </div>
+
+<div className="lg:hidden">
+  <SignOutButton mobile />
+</div>
               </div>
             </div>
 
