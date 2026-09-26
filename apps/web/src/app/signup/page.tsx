@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -95,24 +94,13 @@ export default function SignupPage() {
         return;
       }
 
-      const signInResult =
-        await signIn('credentials', {
-          email,
-          password,
-          redirect: false,
-        });
+      router.push(
+  `/verify-email?email=${encodeURIComponent(
+    email,
+  )}`,
+);
 
-      if (!signInResult?.ok) {
-        setError(
-          'Account created, but automatic sign-in failed. Please sign in manually.',
-        );
-
-        setLoading(false);
-        return;
-      }
-
-      router.push('/dashboard/onboarding');
-      router.refresh();
+router.refresh();
     } catch {
       setError(
         'Unable to reach Hiffs Connect. Please try again.',

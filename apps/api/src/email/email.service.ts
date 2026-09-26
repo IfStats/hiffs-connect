@@ -9,7 +9,7 @@ import { Resend } from 'resend';
 type VerificationEmailInput = {
   to: string;
   name?: string | null;
-  token: string;
+  code: string;
 };
 
 @Injectable()
@@ -17,6 +17,17 @@ export class EmailService {
   constructor(
     private readonly configService: ConfigService,
   ) {}
+
+  private escapeHtml(
+    value: string,
+  ) {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
 
   async sendVerificationEmail(
     input: VerificationEmailInput,
@@ -31,15 +42,10 @@ export class EmailService {
         'EMAIL_FROM',
       );
 
-    const webAppUrl =
-      (
-        this.configService.get<string>(
-          'WEB_APP_URL',
-        ) ??
-        'http://localhost:3000'
-      ).replace(/\/$/, '');
-
-    if (!apiKey || !from) {
+    if (
+      !apiKey ||
+      !from
+    ) {
       throw new InternalServerErrorException(
         'Transactional email is not configured',
       );
@@ -48,13 +54,12 @@ export class EmailService {
     const resend =
       new Resend(apiKey);
 
-    const verificationUrl =
-      `${webAppUrl}/verify-email?token=${encodeURIComponent(
-        input.token,
-      )}`;
+    const name =
+      input.name?.trim() ||
+      'there';
 
-    const displayName =
-      input.name?.trim() || 'there';
+    const safeName =
+      this.escapeHtml(name);
 
     const {
       data,
@@ -62,10 +67,12 @@ export class EmailService {
     } = await resend.emails.send({
       from,
 
-      to: [input.to],
+      to: [
+        input.to,
+      ],
 
       subject:
-        'Verify your Hiffs Connect account',
+        `${input.code} is your Hiffs Connect verification code`,
 
       html: `
         <div
@@ -103,7 +110,7 @@ export class EmailService {
               color:#475569;
             "
           >
-            Hi ${displayName},
+            Hi ${safeName},
           </p>
 
           <p
@@ -113,29 +120,30 @@ export class EmailService {
               color:#475569;
             "
           >
-            Confirm your email address to activate
-            your Hiffs Connect account.
+            Enter this verification code
+            to activate your Hiffs Connect
+            account.
           </p>
 
           <div
             style="
               margin:32px 0;
+              padding:20px;
+              border-radius:12px;
+              background:#f1f5f9;
+              text-align:center;
             "
           >
-            <a
-              href="${verificationUrl}"
+            <div
               style="
-                display:inline-block;
-                background:#2563eb;
-                color:#ffffff;
-                text-decoration:none;
-                padding:14px 24px;
-                border-radius:10px;
-                font-weight:600;
+                font-size:34px;
+                font-weight:700;
+                letter-spacing:8px;
+                color:#0f172a;
               "
             >
-              Verify email address
-            </a>
+              ${input.code}
+            </div>
           </div>
 
           <p
@@ -145,8 +153,20 @@ export class EmailService {
               color:#64748b;
             "
           >
-            This verification link expires in
-            24 hours.
+            This code expires in
+            10 minutes.
+          </p>
+
+          <p
+            style="
+              font-size:14px;
+              line-height:1.6;
+              color:#64748b;
+            "
+          >
+            If you did not create a
+            Hiffs Connect account,
+            you can ignore this email.
           </p>
 
           <p
@@ -156,15 +176,17 @@ export class EmailService {
               color:#94a3b8;
             "
           >
-            Hiffs Connect · Hiffs Global Enterprises
+            Hiffs Connect ·
+            Hiffs Global Enterprises
           </p>
         </div>
       `,
 
       text:
-        `Hi ${displayName},\n\n` +
-        `Verify your Hiffs Connect account:\n${verificationUrl}\n\n` +
-        `This link expires in 24 hours.`,
+        `Hi ${name},\n\n` +
+        `Your Hiffs Connect verification code is:\n\n` +
+        `${input.code}\n\n` +
+        `This code expires in 10 minutes.`,
     });
 
     if (error) {
@@ -174,7 +196,9 @@ export class EmailService {
     }
 
     return {
-      id: data?.id ?? null,
+      id:
+        data?.id ??
+        null,
     };
   }
 }

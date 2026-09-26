@@ -516,6 +516,7 @@ model EmailVerificationToken {
 
   expiresAt DateTime
   usedAt    DateTime?
+  attemptCount Int @default(0)
 
   createdAt DateTime @default(now())
 
