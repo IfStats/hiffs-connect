@@ -5,7 +5,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 
-import { createHash } from 'node:crypto';
+import {
+  createHash,
+  randomBytes,
+} from 'node:crypto';
+
+import { VerifyEmailDto } from './dto/verify-email.dto.js';
+import { ResendVerificationDto } from './dto/resend-verification.dto.js';
 
 import { InvitationStatus } from '@prisma/client';
 
@@ -20,11 +26,14 @@ import { SignupDto } from './dto/signup.dto.js';
 import { PrismaService } from '../prisma.service.js';
 import { VerifyCredentialsDto } from './dto/verify-credentials.dto.js';
 
+import { EmailService } from '../email/email.service.js';
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   async verifyCredentials(dto: VerifyCredentialsDto) {
@@ -109,6 +118,7 @@ export class AuthService {
       throw new ConflictException('An account already exists with this email');
     }
 
+   
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const result = await this.prisma.$transaction(
@@ -161,6 +171,17 @@ export class AuthService {
       },
     );
 
+    const verification =
+  await this.createEmailVerificationToken(
+    result.user.id,
+  );
+
+  await this.emailService.sendVerificationEmail({
+  to: result.user.email,
+  name: result.user.name,
+  token: verification.rawToken,
+});
+
     const accessToken = await this.jwtService.signAsync({
       sub: result.user.id,
       email: result.user.email,
@@ -168,6 +189,17 @@ export class AuthService {
     });
 
     return {
+
+      verification:
+  process.env.NODE_ENV !== 'production'
+    ? {
+        token:
+          verification.rawToken,
+        expiresAt:
+          verification.expiresAt,
+      }
+    : undefined,
+
       user: {
         id: result.user.id,
         email: result.user.email,
@@ -200,6 +232,186 @@ export class AuthService {
       accessToken,
     };
   }
+
+  
+
+private hashVerificationToken(
+  token: string,
+) {
+  return createHash('sha256')
+    .update(token)
+    .digest('hex');
+}
+
+private async createEmailVerificationToken(
+  userId: string,
+) {
+  const rawToken =
+    randomBytes(32).toString('hex');
+
+  const tokenHash =
+    this.hashVerificationToken(rawToken);
+
+  const expiresAt =
+    new Date(
+      Date.now() +
+        24 * 60 * 60 * 1000,
+    );
+
+  await this.prisma.emailVerificationToken.deleteMany({
+    where: {
+      userId,
+      usedAt: null,
+    },
+  });
+
+  await this.prisma.emailVerificationToken.create({
+    data: {
+      userId,
+      tokenHash,
+      expiresAt,
+    },
+  });
+
+  return {
+    rawToken,
+    expiresAt,
+  };
+}
+
+async verifyEmail(
+  dto: VerifyEmailDto,
+) {
+  const tokenHash =
+    this.hashVerificationToken(dto.token);
+
+  const verificationToken =
+    await this.prisma.emailVerificationToken.findUnique({
+      where: {
+        tokenHash,
+      },
+
+      include: {
+        user: true,
+      },
+    });
+
+  if (!verificationToken) {
+    throw new BadRequestException(
+      'Verification link is invalid',
+    );
+  }
+
+  if (verificationToken.usedAt) {
+    throw new BadRequestException(
+      'Verification link has already been used',
+    );
+  }
+
+  if (
+    verificationToken.expiresAt.getTime() <=
+    Date.now()
+  ) {
+    throw new BadRequestException(
+      'Verification link has expired',
+    );
+  }
+
+  if (
+    verificationToken.user.emailVerified
+  ) {
+    return {
+      verified: true,
+      alreadyVerified: true,
+    };
+  }
+
+  const verifiedAt = new Date();
+
+  await this.prisma.$transaction([
+    this.prisma.user.update({
+      where: {
+        id: verificationToken.userId,
+      },
+
+      data: {
+        emailVerified: verifiedAt,
+      },
+    }),
+
+    this.prisma.emailVerificationToken.update({
+      where: {
+        id: verificationToken.id,
+      },
+
+      data: {
+        usedAt: verifiedAt,
+      },
+    }),
+  ]);
+
+  return {
+    verified: true,
+    emailVerified: verifiedAt,
+  };
+}
+
+async resendVerification(
+  dto: ResendVerificationDto,
+) {
+  const email =
+    dto.email.trim().toLowerCase();
+
+  const user =
+    await this.prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+  /*
+   * Deliberately return the same public response
+   * whether or not the email exists.
+   */
+  if (!user || user.emailVerified) {
+    return {
+      accepted: true,
+    };
+  }
+
+  const verification =
+    await this.createEmailVerificationToken(
+      user.id,
+    );
+
+    await this.emailService.sendVerificationEmail({
+  to: user.email,
+  name: user.name,
+  token: verification.rawToken,
+});
+
+  /*
+   * Temporary development response.
+   *
+   * Do not expose the raw token in production.
+   * This will be replaced by actual email delivery.
+   */
+  if (
+    process.env.NODE_ENV !== 'production'
+  ) {
+    return {
+      accepted: true,
+      verificationToken:
+        verification.rawToken,
+      expiresAt:
+        verification.expiresAt,
+    };
+  }
+
+  return {
+    accepted: true,
+  };
+}
 
   async acceptInvitation(userId: string, dto: AcceptInvitationDto) {
     const tokenHash = createHash('sha256').update(dto.token).digest('hex');

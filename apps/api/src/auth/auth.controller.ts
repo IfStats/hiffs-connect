@@ -10,6 +10,9 @@ import { AuthService } from './auth.service.js';
 import { VerifyCredentialsDto } from './dto/verify-credentials.dto.js';
 import { SignupDto } from './dto/signup.dto.js';
 
+import { VerifyEmailDto } from './dto/verify-email.dto.js';
+import { ResendVerificationDto } from './dto/resend-verification.dto.js';
+
 type AuthenticatedRequest = Request & {
   user: AuthUser;
 };
@@ -45,4 +48,20 @@ export class AuthController {
   ) {
     return this.authService.acceptInvitation(request.user.id, dto);
   }
+
+@Post('verify-email')
+verifyEmail(
+  @Body()
+  dto: VerifyEmailDto,
+) {
+  return this.authService.verifyEmail(dto);
+}
+
+@Post('resend-verification')
+resendVerification(
+  @Body()
+  dto: ResendVerificationDto,
+) {
+  return this.authService.resendVerification(dto);
+}
 }

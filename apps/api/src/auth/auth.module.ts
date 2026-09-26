@@ -6,10 +6,12 @@ import { PrismaModule } from '../prisma.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { ApiAuthGuard } from './api-auth.guard.js';
+import { EmailModule } from '../email/email.module.js';
 
 @Module({
   imports: [
     PrismaModule,
+    EmailModule,
 
     JwtModule.registerAsync({
       imports: [ConfigModule],
