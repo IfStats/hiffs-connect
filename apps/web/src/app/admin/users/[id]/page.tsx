@@ -7,6 +7,7 @@ import {
 
 import { authOptions } from '@/auth';
 import { UserStatusControls } from './user-status-controls';
+import { PlatformRoleControls } from './platform-role-controls';
 
 type AccountStatus =
   | 'ACTIVE'
@@ -549,6 +550,17 @@ export default async function AdminUserPage({
   userId={user.id}
   currentStatus={
     user.status
+  }
+  isCurrentUser={
+    session.user.id ===
+    user.id
+  }
+/>
+
+<PlatformRoleControls
+  userId={user.id}
+  currentRole={
+    user.platformRole
   }
   isCurrentUser={
     session.user.id ===
