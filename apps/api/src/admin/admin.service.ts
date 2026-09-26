@@ -31,6 +31,7 @@ export class AdminService {
       select: {
         id: true,
         name: true,
+        status: true,
         countryCode: true,
         website: true,
         email: true,
@@ -67,12 +68,14 @@ export class AdminService {
       select: {
         id: true,
         name: true,
+        status: true,
         countryCode: true,
         website: true,
         email: true,
         phone: true,
         createdAt: true,
         updatedAt: true,
+        
 
         wallet: {
           select: {
@@ -86,6 +89,8 @@ export class AdminService {
         memberships: {
           where: {
             active: true,
+            emailVerified: true,
+            phoneVerified: true,
           },
 
           select: {
@@ -100,6 +105,8 @@ export class AdminService {
                 email: true,
                 name: true,
                 platformRole: true,
+                emailVerified: true,
+                phoneVerified: true,
               },
             },
           },
@@ -129,14 +136,16 @@ export class AdminService {
       },
 
       select: {
-        id: true,
-        email: true,
-        status: true,
-        name: true,
-        platformRole: true,
-        emailVerified: true,
-        createdAt: true,
-        updatedAt: true,
+  id: true,
+  email: true,
+  phone: true,
+  status: true,
+  name: true,
+  platformRole: true,
+  emailVerified: true,
+  phoneVerified: true,
+  createdAt: true,
+  updatedAt: true,
 
         memberships: {
           select: {
@@ -165,14 +174,16 @@ export class AdminService {
       },
 
       select: {
-        id: true,
-        email: true,
-        name: true,
-        status: true,
-        platformRole: true,
-        emailVerified: true,
-        createdAt: true,
-        updatedAt: true,
+  id: true,
+  email: true,
+  phone: true,
+  name: true,
+  status: true,
+  platformRole: true,
+  emailVerified: true,
+  phoneVerified: true,
+  createdAt: true,
+  updatedAt: true,
 
         memberships: {
           select: {
