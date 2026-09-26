@@ -28,12 +28,18 @@ import { VerifyCredentialsDto } from './dto/verify-credentials.dto.js';
 
 import { EmailService } from '../email/email.service.js';
 
+import { SendPhoneVerificationDto } from './dto/send-phone-verification.dto.js';
+import { VerifyPhoneDto } from './dto/verify-phone.dto.js';
+
+import { PhoneVerificationService } from '../phone-verification/phone-verification.service.js';
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly phoneVerificationService: PhoneVerificationService,
   ) {}
 
   async verifyCredentials(dto: VerifyCredentialsDto) {
@@ -75,6 +81,32 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (!user.emailVerified) {
+  throw new UnauthorizedException({
+    message:
+      'Email verification required',
+    code:
+      'EMAIL_NOT_VERIFIED',
+  });
+}
+
+const phoneVerificationRequired =
+  process.env
+    .PHONE_VERIFICATION_REQUIRED ===
+  'true';
+
+if (
+  phoneVerificationRequired &&
+  !user.phoneVerified
+) {
+  throw new UnauthorizedException({
+    message:
+      'Phone verification required',
+    code:
+      'PHONE_NOT_VERIFIED',
+  });
+}
+
     if (user.memberships.length === 0 && !user.platformRole) {
       throw new UnauthorizedException('User has no active workspace');
     }
@@ -108,6 +140,8 @@ export class AuthService {
     const countryCode = dto.countryCode.trim().toUpperCase();
     const businessName = dto.businessName.trim();
 
+    const phone =dto.phone.trim();
+
     const existingUser = await this.prisma.user.findUnique({
       where: {
         email,
@@ -121,11 +155,25 @@ export class AuthService {
    
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
+    const existingPhone =
+  await this.prisma.user.findUnique({
+    where: {
+      phone,
+    },
+  });
+
+if (existingPhone) {
+  throw new ConflictException(
+    'An account already exists with this phone number',
+  );
+}
+
     const result = await this.prisma.$transaction(
       async (tx) => {
         const user = await tx.user.create({
           data: {
             email,
+            phone,
             name: dto.name.trim(),
             passwordHash,
           },
@@ -137,7 +185,7 @@ export class AuthService {
             countryCode,
             website: dto.website?.trim() || null,
             email: dto.businessEmail?.trim().toLowerCase() || email,
-            phone: dto.phone?.trim() || null,
+            phone,
           },
         });
 
@@ -182,13 +230,6 @@ await this.emailService.sendVerificationEmail({
   name: result.user.name,
   code: verification.code,
 });
-
-    const accessToken = await this.jwtService.signAsync({
-      sub: result.user.id,
-      email: result.user.email,
-      platformRole: result.user.platformRole,
-    });
-
     return {
 
       verification:
@@ -229,8 +270,7 @@ await this.emailService.sendVerificationEmail({
         balance: result.wallet.balance,
       },
 
-      accessToken,
-    };
+      };
   }
 
   
@@ -583,4 +623,214 @@ async resendVerification(
       membership: result,
     };
   }
+
+  async sendPhoneVerification(
+  dto: SendPhoneVerificationDto,
+) {
+  const email =
+    dto.email.trim().toLowerCase();
+
+  const user =
+    await this.prisma.user.findUnique({
+      where: {
+        email,
+      },
+
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        emailVerified: true,
+        phoneVerified: true,
+      },
+    });
+
+  /*
+   * Do not disclose whether an account exists.
+   * SMS verification is only available after
+   * email ownership has already been confirmed.
+   */
+  if (
+    !user ||
+    !user.emailVerified ||
+    !user.phone ||
+    user.phoneVerified
+  ) {
+    return {
+      accepted: true,
+    };
+  }
+
+  const latestVerification =
+    await this.prisma.phoneVerification.findFirst({
+      where: {
+        userId: user.id,
+      },
+
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+  /*
+   * Server-side resend cooldown.
+   */
+  if (latestVerification) {
+    const elapsed =
+      Date.now() -
+      latestVerification.createdAt.getTime();
+
+    if (elapsed < 60_000) {
+      return {
+        accepted: true,
+        cooldownSeconds:
+          Math.ceil(
+            (60_000 - elapsed) /
+              1000,
+          ),
+      };
+    }
+  }
+
+  const providerResult =
+    await this.phoneVerificationService.sendPin(
+      user.phone,
+    );
+
+  const expiresAt =
+    new Date(
+      Date.now() +
+        5 * 60 * 1000,
+    );
+
+  await this.prisma.phoneVerification.create({
+    data: {
+      userId: user.id,
+      phone: user.phone,
+
+      provider:
+        providerResult.provider,
+
+      providerPinId:
+        providerResult.pinId,
+
+      expiresAt,
+    },
+  });
+
+  return {
+    accepted: true,
+    cooldownSeconds: 60,
+  };
+}
+
+async verifyPhone(
+  dto: VerifyPhoneDto,
+) {
+  const email =
+    dto.email.trim().toLowerCase();
+
+  const user =
+    await this.prisma.user.findUnique({
+      where: {
+        email,
+      },
+
+      select: {
+        id: true,
+        phone: true,
+        emailVerified: true,
+        phoneVerified: true,
+      },
+    });
+
+  if (
+    !user ||
+    !user.emailVerified ||
+    !user.phone
+  ) {
+    throw new BadRequestException(
+      'Invalid phone verification request',
+    );
+  }
+
+  if (user.phoneVerified) {
+    return {
+      verified: true,
+      alreadyVerified: true,
+    };
+  }
+
+  const verification =
+    await this.prisma.phoneVerification.findFirst({
+      where: {
+        userId: user.id,
+        phone: user.phone,
+        verifiedAt: null,
+      },
+
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+  if (!verification) {
+    throw new BadRequestException(
+      'Request a new verification code',
+    );
+  }
+
+  if (
+    verification.expiresAt.getTime() <=
+    Date.now()
+  ) {
+    throw new BadRequestException(
+      'Verification code has expired',
+    );
+  }
+
+  const result =
+    await this.phoneVerificationService.verifyPin(
+      verification.providerPinId,
+      dto.code,
+    );
+
+  if (!result.verified) {
+    throw new BadRequestException(
+      'Invalid verification code',
+    );
+  }
+
+  const verifiedAt =
+    new Date();
+
+  await this.prisma.$transaction([
+    this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+
+      data: {
+        phoneVerified:
+          verifiedAt,
+      },
+    }),
+
+    this.prisma.phoneVerification.update({
+      where: {
+        id: verification.id,
+      },
+
+      data: {
+        verifiedAt,
+      },
+    }),
+  ]);
+
+  return {
+    verified: true,
+    phoneVerified:
+      verifiedAt,
+  };
+}
 }

@@ -1,0 +1,15 @@
+import {
+  IsEmail,
+  Matches,
+} from 'class-validator';
+
+export class VerifyPhoneDto {
+  @IsEmail()
+  email!: string;
+
+  @Matches(/^\d{6}$/, {
+    message:
+      'code must be a 6-digit verification code',
+  })
+  code!: string;
+}

@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsString,
   Length,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -40,8 +41,10 @@ export class SignupDto {
   @MaxLength(255)
   businessEmail?: string;
 
-  @IsOptional()
   @IsString()
-  @MaxLength(50)
-  phone?: string;
+@Matches(/^\+[1-9]\d{7,14}$/, {
+  message:
+    'phone must be in international E.164 format, for example +233XXXXXXXXX',
+})
+phone!: string;
 }

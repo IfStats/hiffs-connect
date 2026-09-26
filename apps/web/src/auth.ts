@@ -105,8 +105,32 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!response.ok) {
-          return null;
-        }
+  const payload = (await response
+    .json()
+    .catch(() => null)) as {
+    code?: string;
+  } | null;
+
+  if (
+    payload?.code ===
+    'EMAIL_NOT_VERIFIED'
+  ) {
+    throw new Error(
+      'EMAIL_NOT_VERIFIED',
+    );
+  }
+
+  if (
+    payload?.code ===
+    'PHONE_NOT_VERIFIED'
+  ) {
+    throw new Error(
+      'PHONE_NOT_VERIFIED',
+    );
+  }
+
+  return null;
+}
 
         const apiUser =
           (await response.json()) as ApiAuthUser;

@@ -485,6 +485,8 @@ model ProviderSenderRegistration {
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
+  phone         String?   @unique
+  phoneVerified DateTime?
   name          String?
   emailVerified DateTime?
   image         String?
@@ -493,11 +495,12 @@ model User {
   platformRole PlatformRole?
 
   memberships                 BusinessMembership[]
-  walletTransactionsPerformed WalletTransaction[]  @relation("WalletTransactionPerformedBy")
-  status                      AccountStatus        @default(ACTIVE)
-  invitationsSent             BusinessInvitation[] @relation("BusinessInvitationInvitedBy")
-  invitationsAccepted         BusinessInvitation[] @relation("BusinessInvitationAcceptedBy")
-  emailVerificationTokens    EmailVerificationToken[]
+  walletTransactionsPerformed WalletTransaction[]      @relation("WalletTransactionPerformedBy")
+  status                      AccountStatus            @default(ACTIVE)
+  invitationsSent             BusinessInvitation[]     @relation("BusinessInvitationInvitedBy")
+  invitationsAccepted         BusinessInvitation[]     @relation("BusinessInvitationAcceptedBy")
+  emailVerificationTokens     EmailVerificationToken[]
+  phoneVerifications          PhoneVerification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -510,19 +513,43 @@ model EmailVerificationToken {
   id String @id @default(cuid())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tokenHash String @unique
 
-  expiresAt DateTime
-  usedAt    DateTime?
-  attemptCount Int @default(0)
+  expiresAt    DateTime
+  usedAt       DateTime?
+  attemptCount Int       @default(0)
 
   createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([expiresAt])
   @@index([usedAt])
+}
+
+model PhoneVerification {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  phone String
+
+  provider      String @default("infobip")
+  providerPinId String
+
+  expiresAt  DateTime
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([phone])
+  @@index([providerPinId])
+  @@index([expiresAt])
+  @@index([verifiedAt])
 }
 
 model BusinessMembership {

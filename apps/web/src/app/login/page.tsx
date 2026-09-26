@@ -41,12 +41,57 @@ export default function LoginPage() {
     setLoading(false);
 
     if (!result?.ok) {
-      setError(
-        'Invalid email or password',
+  const authError =
+    result?.error ?? '';
+
+  const normalizedEmail =
+    email
+      .trim()
+      .toLowerCase();
+
+  if (
+    authError.includes(
+      'EMAIL_NOT_VERIFIED',
+    )
+  ) {
+    router.push(
+      `/verify-email?email=${encodeURIComponent(
+        normalizedEmail,
+      )}`,
+    );
+
+    return;
+  }
+
+  if (
+    authError.includes(
+      'PHONE_NOT_VERIFIED',
+    )
+  ) {
+    const phoneVerificationEnabled =
+      process.env
+        .NEXT_PUBLIC_PHONE_VERIFICATION_ENABLED ===
+      'true';
+
+    if (
+      phoneVerificationEnabled
+    ) {
+      router.push(
+        `/verify-phone?email=${encodeURIComponent(
+          normalizedEmail,
+        )}`,
       );
 
       return;
     }
+  }
+
+  setError(
+    'Invalid email or password',
+  );
+
+  return;
+}
 
     router.push('/dashboard');
     router.refresh();

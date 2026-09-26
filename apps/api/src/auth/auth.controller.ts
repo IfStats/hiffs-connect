@@ -12,6 +12,8 @@ import { SignupDto } from './dto/signup.dto.js';
 
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { ResendVerificationDto } from './dto/resend-verification.dto.js';
+import { SendPhoneVerificationDto } from './dto/send-phone-verification.dto.js';
+import { VerifyPhoneDto } from './dto/verify-phone.dto.js';
 
 type AuthenticatedRequest = Request & {
   user: AuthUser;
@@ -63,5 +65,35 @@ resendVerification(
   dto: ResendVerificationDto,
 ) {
   return this.authService.resendVerification(dto);
+}
+
+@Post('phone/send-code')
+sendPhoneVerification(
+  @Body()
+  dto: SendPhoneVerificationDto,
+) {
+  return this.authService.sendPhoneVerification(
+    dto,
+  );
+}
+
+@Post('phone/resend')
+resendPhoneVerification(
+  @Body()
+  dto: SendPhoneVerificationDto,
+) {
+  return this.authService.sendPhoneVerification(
+    dto,
+  );
+}
+
+@Post('phone/verify')
+verifyPhone(
+  @Body()
+  dto: VerifyPhoneDto,
+) {
+  return this.authService.verifyPhone(
+    dto,
+  );
 }
 }

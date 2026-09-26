@@ -322,13 +322,16 @@ router.refresh();
               </label>
 
               <input
-                id="phone"
-                name="phone"
-                type="tel"
-                autoComplete="tel"
-                placeholder="+233..."
-                className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-              />
+  id="phone"
+  name="phone"
+  type="tel"
+  required
+  autoComplete="tel"
+  pattern="\+[1-9][0-9]{7,14}"
+  placeholder="+233XXXXXXXXX"
+  title="Use international format, for example +233XXXXXXXXX"
+  className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+/>
             </div>
 
             <div>

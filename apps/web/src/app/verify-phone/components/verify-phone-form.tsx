@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import {
   FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
@@ -11,7 +14,12 @@ type Props = {
   email: string;
 };
 
-export function VerifyEmailForm({
+type SendCodeResponse = {
+  accepted?: boolean;
+  cooldownSeconds?: number;
+};
+
+export function VerifyPhoneForm({
   email,
 }: Props) {
   const router = useRouter();
@@ -28,12 +36,124 @@ export function VerifyEmailForm({
   const [loading, setLoading] =
     useState(false);
 
-  const [resending, setResending] =
+  const [sending, setSending] =
     useState(false);
+
+  const [cooldown, setCooldown] =
+    useState(0);
+
+  const initialRequestSent =
+    useRef(false);
 
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_HIFFS_API_URL ??
     'http://localhost:4000';
+
+  const sendCode =
+    useCallback(
+      async () => {
+        if (sending) {
+          return;
+        }
+
+        setSending(true);
+        setError(null);
+        setMessage(null);
+
+        try {
+          const response =
+            await fetch(
+              `${apiBaseUrl}/auth/phone/send-code`,
+              {
+                method: 'POST',
+
+                headers: {
+                  'Content-Type':
+                    'application/json',
+                },
+
+                body: JSON.stringify({
+                  email,
+                }),
+              },
+            );
+
+          const payload =
+            (await response.json()) as
+              SendCodeResponse & {
+                message?: string | string[];
+              };
+
+          if (!response.ok) {
+            throw new Error(
+              Array.isArray(
+                payload?.message,
+              )
+                ? payload.message.join(
+                    ', ',
+                  )
+                : payload?.message ??
+                    'Unable to send verification code',
+            );
+          }
+
+          setCooldown(
+            payload.cooldownSeconds ??
+              60,
+          );
+
+          setMessage(
+            'A 6-digit verification code has been sent to your phone.',
+          );
+        } catch (caughtError) {
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : 'Unable to send verification code',
+          );
+        } finally {
+          setSending(false);
+        }
+      },
+      [
+        apiBaseUrl,
+        email,
+        sending,
+      ],
+    );
+
+  useEffect(() => {
+    if (
+      initialRequestSent.current
+    ) {
+      return;
+    }
+
+    initialRequestSent.current =
+      true;
+
+    void sendCode();
+  }, [sendCode]);
+
+  useEffect(() => {
+    if (cooldown <= 0) {
+      return;
+    }
+
+    const timer =
+      window.setInterval(() => {
+        setCooldown(
+          (current) =>
+            current <= 1
+              ? 0
+              : current - 1,
+        );
+      }, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [cooldown]);
 
   async function handleVerify(
     event: FormEvent<HTMLFormElement>,
@@ -44,6 +164,7 @@ export function VerifyEmailForm({
       setError(
         'Enter the 6-digit verification code.',
       );
+
       return;
     }
 
@@ -52,22 +173,23 @@ export function VerifyEmailForm({
     setMessage(null);
 
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/auth/verify-email`,
-        {
-          method: 'POST',
+      const response =
+        await fetch(
+          `${apiBaseUrl}/auth/phone/verify`,
+          {
+            method: 'POST',
 
-          headers: {
-            'Content-Type':
-              'application/json',
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+
+            body: JSON.stringify({
+              email,
+              code,
+            }),
           },
-
-          body: JSON.stringify({
-            email,
-            code,
-          }),
-        },
-      );
+        );
 
       const payload =
         await response.json();
@@ -81,22 +203,20 @@ export function VerifyEmailForm({
                 ', ',
               )
             : payload?.message ??
-                'Verification failed',
+                'Phone verification failed',
         );
       }
 
       router.push(
-  `/verify-phone?email=${encodeURIComponent(
-    email,
-  )}`,
-);
+        '/login?verified=true',
+      );
 
       router.refresh();
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : 'Unable to verify email',
+          : 'Unable to verify phone number',
       );
     } finally {
       setLoading(false);
@@ -104,66 +224,36 @@ export function VerifyEmailForm({
   }
 
   async function handleResend() {
-    setResending(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/auth/resend-verification`,
-        {
-          method: 'POST',
-
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-
-          body: JSON.stringify({
-            email,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          'Unable to resend verification code',
-        );
-      }
-
-      setCode('');
-
-      setMessage(
-        'If the account is eligible, a new verification code has been sent.',
-      );
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : 'Unable to resend verification code',
-      );
-    } finally {
-      setResending(false);
+    if (
+      sending ||
+      cooldown > 0
+    ) {
+      return;
     }
+
+    setCode('');
+
+    await sendCode();
   }
 
   return (
     <div className="w-full max-w-md">
       <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-xl shadow-slate-200/50 sm:p-10">
         <p className="text-sm font-semibold text-blue-600">
-          Account verification
+          Phone verification
         </p>
 
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
-          Check your email
+          Verify your number
         </h1>
 
         <p className="mt-4 text-sm leading-6 text-slate-500">
-          We sent a 6-digit verification
-          code to
+          Enter the 6-digit code sent
+          to the phone number attached
+          to your Hiffs Connect account.
         </p>
 
-        <p className="mt-1 break-all text-sm font-semibold text-slate-900">
+        <p className="mt-2 break-all text-sm font-semibold text-slate-900">
           {email}
         </p>
 
@@ -172,14 +262,14 @@ export function VerifyEmailForm({
           className="mt-8"
         >
           <label
-            htmlFor="verification-code"
+            htmlFor="phone-code"
             className="text-sm font-medium text-slate-700"
           >
             Verification code
           </label>
 
           <input
-            id="verification-code"
+            id="phone-code"
             name="code"
             type="text"
             inputMode="numeric"
@@ -190,8 +280,14 @@ export function VerifyEmailForm({
             onChange={(event) => {
               const value =
                 event.target.value
-                  .replace(/\D/g, '')
-                  .slice(0, 6);
+                  .replace(
+                    /\D/g,
+                    '',
+                  )
+                  .slice(
+                    0,
+                    6,
+                  );
 
               setCode(value);
             }}
@@ -200,8 +296,8 @@ export function VerifyEmailForm({
           />
 
           <p className="mt-2 text-xs text-slate-400">
-            The code expires after
-            10 minutes.
+            The verification code
+            expires after 5 minutes.
           </p>
 
           {error && (
@@ -226,7 +322,7 @@ export function VerifyEmailForm({
           >
             {loading
               ? 'Verifying...'
-              : 'Verify email'}
+              : 'Verify phone'}
           </button>
         </form>
 
@@ -237,13 +333,20 @@ export function VerifyEmailForm({
 
           <button
             type="button"
-            onClick={handleResend}
-            disabled={resending}
-            className="mt-2 text-sm font-semibold text-blue-600 disabled:opacity-50"
+            onClick={
+              handleResend
+            }
+            disabled={
+              sending ||
+              cooldown > 0
+            }
+            className="mt-2 text-sm font-semibold text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {resending
+            {sending
               ? 'Sending...'
-              : 'Send another code'}
+              : cooldown > 0
+                ? `Send again in ${cooldown}s`
+                : 'Send another code'}
           </button>
         </div>
 
