@@ -565,7 +565,8 @@ async importContacts(
   const seenPhones =
     new Set<string>();
 
-  const rows = [];
+  const rows: ImportContactsDto['contacts'] =
+    [];
 
   for (const row of dto.contacts) {
     const phone =
@@ -580,9 +581,7 @@ async importContacts(
       continue;
     }
 
-    if (
-      seenPhones.has(phone)
-    ) {
+    if (seenPhones.has(phone)) {
       summary.duplicatesInFile += 1;
       summary.skipped += 1;
       continue;
@@ -597,7 +596,10 @@ async importContacts(
   }
 
   if (rows.length === 0) {
-    return summary;
+    return {
+      ...summary,
+      contacts: [],
+    };
   }
 
   const existingContacts =
@@ -613,6 +615,7 @@ async importContacts(
       },
 
       select: {
+        id: true,
         phone: true,
         status: true,
       },
@@ -623,67 +626,102 @@ async importContacts(
       existingContacts.map(
         (contact) => [
           contact.phone,
-          contact.status,
+          contact,
         ],
       ),
     );
 
+  const resolvedContacts: Array<{
+    id: string;
+    phone: string;
+    status:
+      | 'ACTIVE'
+      | 'UNSUBSCRIBED'
+      | 'BLOCKED';
+    created: boolean;
+  }> = [];
+
   for (const row of rows) {
-    const existingStatus =
+    const existing =
       existingByPhone.get(
         row.phone,
       );
 
-    if (existingStatus) {
+    if (existing) {
       summary.skipped += 1;
 
       if (
-        existingStatus ===
+        existing.status ===
           'UNSUBSCRIBED' ||
-        existingStatus ===
+        existing.status ===
           'BLOCKED'
       ) {
         summary.suppressed += 1;
       }
 
+      resolvedContacts.push({
+        id: existing.id,
+        phone: existing.phone,
+        status: existing.status,
+        created: false,
+      });
+
       continue;
     }
 
     try {
-      await this.prisma.contact.create({
-        data: {
-          businessId,
+      const created =
+        await this.prisma.contact.create({
+          data: {
+            businessId,
 
-          phone:
-            row.phone,
+            phone: row.phone,
 
-          firstName:
-            row.firstName?.trim() ||
-            null,
+            firstName:
+              row.firstName?.trim() ||
+              null,
 
-          lastName:
-            row.lastName?.trim() ||
-            null,
+            lastName:
+              row.lastName?.trim() ||
+              null,
 
-          displayName:
-            row.displayName?.trim() ||
-            null,
+            displayName:
+              row.displayName?.trim() ||
+              null,
 
-          email:
-            row.email
-              ?.trim()
-              .toLowerCase() ||
-            null,
+            email:
+              row.email
+                ?.trim()
+                .toLowerCase() ||
+              null,
 
-          source:
-            row.source?.trim() ||
-            'CSV_IMPORT',
+            source:
+              row.source?.trim() ||
+              'CSV_IMPORT',
 
-          status: 'ACTIVE',
-        },
-      });
+            status: 'ACTIVE',
+          },
+
+          select: {
+            id: true,
+            phone: true,
+            status: true,
+          },
+        });
 
       summary.created += 1;
+
+      resolvedContacts.push({
+        id: created.id,
+        phone: created.phone,
+        status: created.status,
+        created: true,
+      });
+
+      existingByPhone.set(
+        created.phone,
+        created,
+      );
     } catch (error) {
       if (
         error instanceof
@@ -691,6 +729,46 @@ async importContacts(
         error.code === 'P2002'
       ) {
         summary.skipped += 1;
+
+        /*
+         * Another request may have
+         * created the contact between
+         * our lookup and insert.
+         * Resolve it so callers still
+         * receive its contact ID.
+         */
+        const contact =
+          await this.prisma.contact.findFirst({
+            where: {
+              businessId,
+              phone: row.phone,
+            },
+
+            select: {
+              id: true,
+              phone: true,
+              status: true,
+            },
+          });
+
+        if (contact) {
+          if (
+            contact.status ===
+              'UNSUBSCRIBED' ||
+            contact.status ===
+              'BLOCKED'
+          ) {
+            summary.suppressed += 1;
+          }
+
+          resolvedContacts.push({
+            id: contact.id,
+            phone: contact.phone,
+            status: contact.status,
+            created: false,
+          });
+        }
+
         continue;
       }
 
@@ -698,6 +776,9 @@ async importContacts(
     }
   }
 
-  return summary;
+  return {
+    ...summary,
+    contacts: resolvedContacts,
+  };
 }
 }

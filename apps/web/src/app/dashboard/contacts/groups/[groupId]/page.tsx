@@ -7,12 +7,8 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/auth";
 
 import {
-  AddGroupMemberForm,
-} from "./components/add-group-member-form";
-
-import {
-  RemoveGroupMemberButton,
-} from "./components/group-member-actions";
+  GroupMembersEditor,
+} from "./components/group-members-editor";
 
 import {
   GroupSettings,
@@ -20,6 +16,7 @@ import {
 
 type GroupMember = {
   id: string;
+
   contact: {
     id: string;
     firstName: string | null;
@@ -27,6 +24,7 @@ type GroupMember = {
     displayName: string | null;
     phone: string;
     email: string | null;
+
     status:
       | "ACTIVE"
       | "UNSUBSCRIBED"
@@ -48,6 +46,8 @@ type Contact = {
   lastName: string | null;
   displayName: string | null;
   phone: string;
+  email: string | null;
+
   status:
     | "ACTIVE"
     | "UNSUBSCRIBED"
@@ -67,12 +67,29 @@ type Props = {
   }>;
 };
 
+function getContactLabel(
+  contact: Contact,
+) {
+  if (contact.displayName?.trim()) {
+    return contact.displayName.trim();
+  }
+
+  const fullName = [
+    contact.firstName,
+    contact.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return fullName || contact.phone;
+}
+
 export default async function ContactGroupPage({
   params,
 }: Props) {
-  const {
-    groupId,
-  } = await params;
+  const { groupId } =
+    await params;
 
   const session =
     await getServerSession(
@@ -129,7 +146,9 @@ export default async function ContactGroupPage({
     ),
   ]);
 
-  if (groupResponse.status === 404) {
+  if (
+    groupResponse.status === 404
+  ) {
     redirect(
       "/dashboard/contacts",
     );
@@ -139,8 +158,29 @@ export default async function ContactGroupPage({
     !groupResponse.ok ||
     !contactsResponse.ok
   ) {
+    const groupError =
+      !groupResponse.ok
+        ? await groupResponse.text()
+        : null;
+
+    const contactsError =
+      !contactsResponse.ok
+        ? await contactsResponse.text()
+        : null;
+
+    console.error(
+  [
+    "Contact group page load failed",
+    `groupId=${groupId}`,
+    `groupStatus=${groupResponse.status}`,
+    `groupError=${groupError ?? "none"}`,
+    `contactsStatus=${contactsResponse.status}`,
+    `contactsError=${contactsError ?? "none"}`,
+  ].join(" | "),
+);
+
     throw new Error(
-      "Unable to load contact group",
+      `Unable to load contact group (group: ${groupResponse.status}, contacts: ${contactsResponse.status})`,
     );
   }
 
@@ -150,44 +190,35 @@ export default async function ContactGroupPage({
   const contacts =
     (await contactsResponse.json()) as Contact[];
 
-  const memberContactIds =
-    new Set(
-      group.members.map(
-        (member) =>
-          member.contact.id,
-      ),
+  const initialMemberIds =
+    group.members.map(
+      (member) =>
+        member.contact.id,
     );
 
-  const availableContacts =
-    contacts
-      .filter(
-        (contact) =>
-          !memberContactIds.has(
-            contact.id,
+  const editorContacts =
+    contacts.map(
+      (contact) => ({
+        id: contact.id,
+
+        label:
+          getContactLabel(
+            contact,
           ),
-      )
-      .map((contact) => {
-        const fullName = [
-          contact.firstName,
-          contact.lastName,
-        ]
-          .filter(Boolean)
-          .join(" ");
 
-        const label =
-          contact.displayName ??
-          (fullName ||
-            contact.phone);
+        phone:
+          contact.phone,
 
-        return {
-          id: contact.id,
-          label,
-          phone: contact.phone,
-        };
-      });
+        email:
+          contact.email,
+
+        status:
+          contact.status,
+      }),
+    );
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8">
       <section>
         <Link
           href="/dashboard/contacts"
@@ -223,148 +254,51 @@ export default async function ContactGroupPage({
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <section className="rounded-2xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 p-5">
-            <h2 className="font-semibold">
-              Group members
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Contacts currently
-              assigned to this audience.
-            </p>
-          </div>
-
-          {group.members.length ===
-          0 ? (
-            <div className="p-8 text-sm text-slate-500">
-              This group has no
-              contacts yet.
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {group.members.map(
-                (member) => {
-                  const contact =
-                    member.contact;
-
-                  const fullName = [
-                    contact.firstName,
-                    contact.lastName,
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
-
-                  const name =
-                    contact.displayName ??
-                    (fullName ||
-                      contact.phone);
-
-                  return (
-                    <div
-                      key={member.id}
-                      className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="font-medium text-slate-900">
-                          {name}
-                        </p>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                          {
-                            contact.phone
-                          }
-                          {contact.email
-                            ? ` · ${contact.email}`
-                            : ""}
-                        </p>
-
-                        <span
-                          className={[
-                            "mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-                            contact.status ===
-                            "ACTIVE"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : contact.status ===
-                                  "UNSUBSCRIBED"
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-red-50 text-red-700",
-                          ].join(" ")}
-                        >
-                          {
-                            contact.status
-                          }
-                        </span>
-                      </div>
-
-                      <RemoveGroupMemberButton
-                        businessId={
-                          businessId
-                        }
-                        groupId={
-                          groupId
-                        }
-                        contactId={
-                          contact.id
-                        }
-                        accessToken={
-                          accessToken
-                        }
-                      />
-                    </div>
-                  );
-                },
-              )}
-            </div>
-          )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6">
+          <GroupMembersEditor
+            businessId={
+              businessId
+            }
+            groupId={groupId}
+            accessToken={
+              accessToken
+            }
+            contacts={
+              editorContacts
+            }
+            initialMemberIds={
+              initialMemberIds
+            }
+          />
         </section>
 
         <aside className="space-y-6">
           <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h2 className="font-semibold">
-              Add member
+            <h2 className="font-semibold text-slate-950">
+              Group settings
             </h2>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5">
-  <h2 className="font-semibold">
-    Group settings
-  </h2>
-
-  <p className="mt-1 text-sm leading-6 text-slate-500">
-    Update this audience or remove the
-    group.
-  </p>
-
-  <div className="mt-5">
-    <GroupSettings
-      businessId={businessId}
-      groupId={groupId}
-      accessToken={accessToken}
-      name={group.name}
-      description={
-        group.description
-      }
-    />
-  </div>
-</section>
-
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Add an existing contact
-              to this group.
+              Rename this audience,
+              update its description,
+              or delete the group.
             </p>
 
             <div className="mt-5">
-              <AddGroupMemberForm
+              <GroupSettings
                 businessId={
                   businessId
                 }
-                groupId={groupId}
+                groupId={
+                  groupId
+                }
                 accessToken={
                   accessToken
                 }
-                contacts={
-                  availableContacts
+                name={group.name}
+                description={
+                  group.description
                 }
               />
             </div>
@@ -372,15 +306,30 @@ export default async function ContactGroupPage({
 
           <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
             <p className="text-sm font-semibold text-blue-950">
-              Campaign ready
+              Audience management
             </p>
 
             <p className="mt-2 text-sm leading-6 text-blue-800">
-              Contact groups will be
-              reusable as campaign
-              audiences. Unsubscribed
-              and blocked contacts will
-              be excluded from sends.
+              Select or remove
+              contacts from this
+              audience and save all
+              membership changes
+              together.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-amber-100 bg-amber-50 p-5">
+            <p className="text-sm font-semibold text-amber-950">
+              Messaging safety
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              Group membership does
+              not override contact
+              consent. Unsubscribed
+              and blocked contacts
+              must remain excluded
+              from message delivery.
             </p>
           </section>
         </aside>
