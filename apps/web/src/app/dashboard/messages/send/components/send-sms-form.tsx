@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 
+import { ContactsRecipientPicker } from "./contacts-recipient-picker";
 import { SmsComposer } from "./sms-composer";
 
 type SenderRegistration = {
@@ -53,13 +54,14 @@ type SendResult =
       data: SingleSendResult;
     }
   | {
-      mode: "multiple";
+      mode: "batch";
       data: BatchSendResult;
     };
 
 type RecipientMode =
   | "single"
-  | "multiple";
+  | "multiple"
+  | "contacts";
 
 export function SendSmsForm({
   businessId,
@@ -84,6 +86,16 @@ export function SendSmsForm({
     useState<RecipientMode>(
       "single",
     );
+
+  const [
+    selectedContacts,
+    setSelectedContacts,
+  ] = useState<string[]>([]);
+
+  const apiUrl =
+    process.env
+      .NEXT_PUBLIC_HIFFS_API_URL ??
+    "";
 
   function changeRecipientMode(
     mode: RecipientMode,
@@ -117,7 +129,7 @@ export function SendSmsForm({
       form.get("recipients") ?? "",
     );
 
-    const recipients =
+    const manualRecipients =
       recipientMode === "multiple"
         ? [
             ...new Set(
@@ -130,6 +142,19 @@ export function SendSmsForm({
             ),
           ]
         : [];
+
+    const recipients =
+      recipientMode === "contacts"
+        ? [
+            ...new Set(
+              selectedContacts
+                .map((value) =>
+                  value.trim(),
+                )
+                .filter(Boolean),
+            ),
+          ]
+        : manualRecipients;
 
     const text = String(
       form.get("text") ?? "",
@@ -154,19 +179,22 @@ export function SendSmsForm({
     }
 
     if (
-      recipientMode ===
-        "multiple" &&
+      recipientMode !==
+        "single" &&
       recipients.length === 0
     ) {
       setError(
-        "Enter at least one recipient.",
+        recipientMode ===
+          "contacts"
+          ? "Select at least one contact."
+          : "Enter at least one recipient.",
       );
       return;
     }
 
     if (
-      recipientMode ===
-        "multiple" &&
+      recipientMode !==
+        "single" &&
       recipients.length > 100
     ) {
       setError(
@@ -182,10 +210,6 @@ export function SendSmsForm({
       return;
     }
 
-    const apiUrl =
-      process.env
-        .NEXT_PUBLIC_HIFFS_API_URL;
-
     if (!apiUrl) {
       setError(
         "API URL is not configured.",
@@ -199,8 +223,8 @@ export function SendSmsForm({
 
     try {
       const isBatch =
-        recipientMode ===
-        "multiple";
+        recipientMode !==
+        "single";
 
       const response =
         await fetch(
@@ -252,7 +276,7 @@ export function SendSmsForm({
 
       if (isBatch) {
         setResult({
-          mode: "multiple",
+          mode: "batch",
           data:
             data as BatchSendResult,
         });
@@ -383,11 +407,28 @@ export function SendSmsForm({
             >
               Multiple
             </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                changeRecipientMode(
+                  "contacts",
+                )
+              }
+              className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+                recipientMode ===
+                "contacts"
+                  ? "border-slate-950 bg-slate-950 text-white"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Contacts & Groups
+            </button>
           </div>
         </div>
 
         {recipientMode ===
-        "single" ? (
+          "single" && (
           <div>
             <label
               htmlFor="recipient"
@@ -410,7 +451,10 @@ export function SendSmsForm({
               E.164 format.
             </p>
           </div>
-        ) : (
+        )}
+
+        {recipientMode ===
+          "multiple" && (
           <div>
             <label
               htmlFor="recipients"
@@ -441,6 +485,37 @@ export function SendSmsForm({
               batch.
             </p>
           </div>
+        )}
+
+        {recipientMode ===
+          "contacts" && (
+          <>
+            {!apiUrl ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                API URL is not
+                configured.
+              </div>
+            ) : (
+              <ContactsRecipientPicker
+                apiUrl={apiUrl}
+                businessId={
+                  businessId
+                }
+                accessToken={
+                  accessToken
+                }
+                value={
+                  selectedContacts
+                }
+                onChange={
+                  setSelectedContacts
+                }
+                maxRecipients={
+                  100
+                }
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -520,7 +595,7 @@ export function SendSmsForm({
       )}
 
       {result?.mode ===
-        "multiple" && (
+        "batch" && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
           <p className="text-sm font-semibold text-emerald-900">
             Batch submitted
@@ -590,6 +665,7 @@ export function SendSmsForm({
                         className="text-xs text-red-700"
                       >
                         {item.to}
+
                         {item.error
                           ? ` — ${item.error}`
                           : ""}
@@ -621,9 +697,17 @@ export function SendSmsForm({
           {loading
             ? "Sending..."
             : recipientMode ===
-                "multiple"
-              ? "Send batch SMS"
-              : "Send SMS"}
+                "single"
+              ? "Send SMS"
+              : recipientMode ===
+                  "contacts"
+                ? `Send to ${selectedContacts.length} contact${
+                    selectedContacts.length ===
+                    1
+                      ? ""
+                      : "s"
+                  }`
+                : "Send batch SMS"}
         </button>
       </div>
     </form>
