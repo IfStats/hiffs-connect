@@ -10,6 +10,7 @@ import {
 import { PrismaService } from '../prisma.service.js';
 
 import { SendSmsDto } from './dto/send-sms.dto.js';
+import { SendBatchSmsDto } from './dto/send-batch-sms.dto.js';
 import { InfobipDeliveryReportDto } from './dto/infobip-delivery-report.dto.js';
 import { RouteMobileDeliveryReportDto } from './dto/routemobile-delivery-report.dto.js';
 
@@ -881,6 +882,67 @@ customerPrice:
       `Unsupported messaging provider: ${provider}`,
     );
   }
+
+  async sendBatchSms(
+  dto: SendBatchSmsDto,
+  authenticatedBusinessId: string,
+) {
+  const recipients = [
+    ...new Set(
+      dto.recipients.map((recipient) =>
+        recipient.trim(),
+      ),
+    ),
+  ];
+
+  const results = [];
+
+  for (const to of recipients) {
+    try {
+      const result = await this.sendSms(
+        {
+          to,
+          text: dto.text,
+          senderRegistrationId:
+            dto.senderRegistrationId,
+        },
+        authenticatedBusinessId,
+      );
+
+      results.push({
+        to,
+        success: true,
+        id: result.id,
+        status: result.status,
+        segmentCount:
+          result.segmentCount,
+        customerPrice:
+          result.customerPrice,
+        currency: result.currency,
+      });
+    } catch (error) {
+      results.push({
+        to,
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'SMS submission failed',
+      });
+    }
+  }
+
+  return {
+    submitted: recipients.length,
+    successful: results.filter(
+      (result) => result.success,
+    ).length,
+    failed: results.filter(
+      (result) => !result.success,
+    ).length,
+    results,
+  };
+}
 
   async getMessages(
   businessId: string,

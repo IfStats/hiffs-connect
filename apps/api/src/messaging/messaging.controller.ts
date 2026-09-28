@@ -15,6 +15,7 @@ import { ApiKeyGuard, type ApiKeyRequest } from '../api-keys/api-key.guard.js';
 import type { Response } from 'express';
 import { MessagingService } from './messaging.service.js';
 import { SendSmsDto } from './dto/send-sms.dto.js';
+import { SendBatchSmsDto } from './dto/send-batch-sms.dto.js';
 import { InfobipDeliveryReportDto } from './dto/infobip-delivery-report.dto.js';
 import { RouteMobileDeliveryReportDto } from './dto/routemobile-delivery-report.dto.js';
 import { ApiAuthGuard } from '../auth/api-auth.guard.js';
@@ -53,6 +54,27 @@ sendBusinessSms(
   dto: SendSmsDto,
 ) {
   return this.messagingService.sendSms(
+    dto,
+    businessId,
+  );
+}
+
+@Post('business/:businessId/sms/batch')
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(
+  Permission.MESSAGE_SEND,
+)
+sendBusinessBatchSms(
+  @Param('businessId')
+  businessId: string,
+
+  @Body()
+  dto: SendBatchSmsDto,
+) {
+  return this.messagingService.sendBatchSms(
     dto,
     businessId,
   );

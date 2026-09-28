@@ -21,15 +21,45 @@ type Props = {
   senders: SenderRegistration[];
 };
 
-type SendResult = {
+type SingleSendResult = {
   id?: string;
   status?: string;
-  provider?: string;
-  providerMessageId?: string | null;
   segmentCount?: number | null;
   customerPrice?: string | number | null;
   currency?: string | null;
 };
+
+type BatchItemResult = {
+  to: string;
+  success: boolean;
+  id?: string;
+  status?: string;
+  segmentCount?: number | null;
+  customerPrice?: string | number | null;
+  currency?: string | null;
+  error?: string;
+};
+
+type BatchSendResult = {
+  submitted: number;
+  successful: number;
+  failed: number;
+  results: BatchItemResult[];
+};
+
+type SendResult =
+  | {
+      mode: "single";
+      data: SingleSendResult;
+    }
+  | {
+      mode: "multiple";
+      data: BatchSendResult;
+    };
+
+type RecipientMode =
+  | "single"
+  | "multiple";
 
 export function SendSmsForm({
   businessId,
@@ -43,17 +73,34 @@ export function SendSmsForm({
     useState<string | null>(null);
 
   const [result, setResult] =
-    useState<SendResult | null>(null);
+    useState<SendResult | null>(
+      null,
+    );
+
+  const [
+    recipientMode,
+    setRecipientMode,
+  ] =
+    useState<RecipientMode>(
+      "single",
+    );
+
+  function changeRecipientMode(
+    mode: RecipientMode,
+  ) {
+    setRecipientMode(mode);
+    setError(null);
+    setResult(null);
+  }
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
-    const form =
-      new FormData(
-        event.currentTarget,
-      );
+    const form = new FormData(
+      event.currentTarget,
+    );
 
     const senderRegistrationId =
       String(
@@ -66,22 +113,64 @@ export function SendSmsForm({
       form.get("to") ?? "",
     ).trim();
 
+    const rawRecipients = String(
+      form.get("recipients") ?? "",
+    );
+
+    const recipients =
+      recipientMode === "multiple"
+        ? [
+            ...new Set(
+              rawRecipients
+                .split(/[\n,;]+/)
+                .map((value) =>
+                  value.trim(),
+                )
+                .filter(Boolean),
+            ),
+          ]
+        : [];
+
     const text = String(
       form.get("text") ?? "",
     );
 
-    if (
-      !senderRegistrationId
-    ) {
+    if (!senderRegistrationId) {
       setError(
         "Select an approved sender.",
       );
       return;
     }
 
-    if (!to) {
+    if (
+      recipientMode ===
+        "single" &&
+      !to
+    ) {
       setError(
         "Recipient phone number is required.",
+      );
+      return;
+    }
+
+    if (
+      recipientMode ===
+        "multiple" &&
+      recipients.length === 0
+    ) {
+      setError(
+        "Enter at least one recipient.",
+      );
+      return;
+    }
+
+    if (
+      recipientMode ===
+        "multiple" &&
+      recipients.length > 100
+    ) {
+      setError(
+        "A maximum of 100 recipients can be submitted at once.",
       );
       return;
     }
@@ -109,9 +198,15 @@ export function SendSmsForm({
     setResult(null);
 
     try {
+      const isBatch =
+        recipientMode ===
+        "multiple";
+
       const response =
         await fetch(
-          `${apiUrl}/messaging/business/${businessId}/sms`,
+          isBatch
+            ? `${apiUrl}/messaging/business/${businessId}/sms/batch`
+            : `${apiUrl}/messaging/business/${businessId}/sms`,
           {
             method: "POST",
 
@@ -123,11 +218,19 @@ export function SendSmsForm({
                 "application/json",
             },
 
-            body: JSON.stringify({
-              senderRegistrationId,
-              to,
-              text,
-            }),
+            body: JSON.stringify(
+              isBatch
+                ? {
+                    senderRegistrationId,
+                    recipients,
+                    text,
+                  }
+                : {
+                    senderRegistrationId,
+                    to,
+                    text,
+                  },
+            ),
           },
         );
 
@@ -147,12 +250,23 @@ export function SendSmsForm({
         );
       }
 
-      setResult(
-        data as SendResult,
-      );
+      if (isBatch) {
+        setResult({
+          mode: "multiple",
+          data:
+            data as BatchSendResult,
+        });
+      } else {
+        setResult({
+          mode: "single",
+          data:
+            data as SingleSendResult,
+        });
+      }
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error
+        caughtError instanceof
+          Error
           ? caughtError.message
           : "Failed to send SMS",
       );
@@ -213,41 +327,121 @@ export function SendSmsForm({
         </select>
 
         <p className="mt-2 text-xs text-slate-500">
-          Only approved SMS sender
-          identities can be used for
-          delivery.
+          Only approved SMS
+          sender identities can be
+          used for delivery.
         </p>
 
-        {senders.length === 0 && (
+        {senders.length ===
+          0 && (
           <p className="mt-2 text-xs text-amber-700">
-            You need an approved SMS
-            sender before messages can
-            be submitted.
+            You need an approved
+            SMS sender before
+            messages can be
+            submitted.
           </p>
         )}
       </div>
 
-      <div>
-        <label
-          htmlFor="recipient"
-          className="mb-2 block text-sm font-medium"
-        >
-          Recipient
-        </label>
+      <div className="space-y-4">
+        <div>
+          <p className="mb-2 block text-sm font-medium">
+            Recipients
+          </p>
 
-        <input
-          id="recipient"
-          name="to"
-          type="tel"
-          required
-          placeholder="+233XXXXXXXXX"
-          className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-slate-400"
-        />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                changeRecipientMode(
+                  "single",
+                )
+              }
+              className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+                recipientMode ===
+                "single"
+                  ? "border-slate-950 bg-slate-950 text-white"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Single
+            </button>
 
-        <p className="mt-2 text-xs text-slate-500">
-          Use international E.164
-          format.
-        </p>
+            <button
+              type="button"
+              onClick={() =>
+                changeRecipientMode(
+                  "multiple",
+                )
+              }
+              className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+                recipientMode ===
+                "multiple"
+                  ? "border-slate-950 bg-slate-950 text-white"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Multiple
+            </button>
+          </div>
+        </div>
+
+        {recipientMode ===
+        "single" ? (
+          <div>
+            <label
+              htmlFor="recipient"
+              className="mb-2 block text-sm font-medium"
+            >
+              Recipient
+            </label>
+
+            <input
+              id="recipient"
+              name="to"
+              type="tel"
+              required
+              placeholder="+233XXXXXXXXX"
+              className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-slate-400"
+            />
+
+            <p className="mt-2 text-xs text-slate-500">
+              Use international
+              E.164 format.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <label
+              htmlFor="recipients"
+              className="mb-2 block text-sm font-medium"
+            >
+              Phone numbers
+            </label>
+
+            <textarea
+              id="recipients"
+              name="recipients"
+              required
+              rows={7}
+              placeholder={
+                "+233XXXXXXXXX\n+234XXXXXXXXXX\n+233XXXXXXXXX"
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-400"
+            />
+
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Enter one number per
+              line, or separate
+              numbers with commas or
+              semicolons. Duplicate
+              numbers are removed
+              automatically. Maximum
+              100 recipients per
+              batch.
+            </p>
+          </div>
+        )}
       </div>
 
       <SmsComposer />
@@ -258,61 +452,153 @@ export function SendSmsForm({
         </div>
       )}
 
-      {result && (
+      {result?.mode ===
+        "single" && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
           <p className="text-sm font-semibold text-emerald-900">
             SMS submitted
           </p>
 
           <dl className="mt-3 space-y-2 text-sm text-emerald-800">
-            {result.status && (
-              <div className="flex justify-between gap-4">
-                <dt>Status</dt>
-                <dd className="font-medium">
-                  {result.status}
-                </dd>
-              </div>
-            )}
-
-            {result.provider && (
-              <div className="flex justify-between gap-4">
-                <dt>Provider</dt>
-                <dd className="font-medium">
-                  {result.provider}
-                </dd>
-              </div>
-            )}
-
-            {result.segmentCount !=
-              null && (
+            {result.data
+              .status && (
               <div className="flex justify-between gap-4">
                 <dt>
-                  SMS pages
+                  Status
                 </dt>
+
                 <dd className="font-medium">
                   {
-                    result.segmentCount
+                    result.data
+                      .status
                   }
                 </dd>
               </div>
             )}
 
-            {result.customerPrice !=
+            {result.data
+              .segmentCount !=
+              null && (
+              <div className="flex justify-between gap-4">
+                <dt>
+                  SMS pages
+                </dt>
+
+                <dd className="font-medium">
+                  {
+                    result.data
+                      .segmentCount
+                  }
+                </dd>
+              </div>
+            )}
+
+            {result.data
+              .customerPrice !=
               null &&
-              result.currency && (
+              result.data
+                .currency && (
                 <div className="flex justify-between gap-4">
-                  <dt>Charge</dt>
+                  <dt>
+                    Charge
+                  </dt>
+
                   <dd className="font-medium">
                     {
-                      result.currency
+                      result.data
+                        .currency
                     }{" "}
                     {
-                      result.customerPrice
+                      result.data
+                        .customerPrice
                     }
                   </dd>
                 </div>
               )}
           </dl>
+        </div>
+      )}
+
+      {result?.mode ===
+        "multiple" && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-900">
+            Batch submitted
+          </p>
+
+          <dl className="mt-3 space-y-2 text-sm text-emerald-800">
+            <div className="flex justify-between gap-4">
+              <dt>
+                Recipients
+              </dt>
+
+              <dd className="font-medium">
+                {
+                  result.data
+                    .submitted
+                }
+              </dd>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <dt>
+                Accepted
+              </dt>
+
+              <dd className="font-medium">
+                {
+                  result.data
+                    .successful
+                }
+              </dd>
+            </div>
+
+            <div className="flex justify-between gap-4">
+              <dt>
+                Failed
+              </dt>
+
+              <dd className="font-medium">
+                {
+                  result.data
+                    .failed
+                }
+              </dd>
+            </div>
+          </dl>
+
+          {result.data.failed >
+            0 && (
+            <div className="mt-4 border-t border-emerald-200 pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900">
+                Failed recipients
+              </p>
+
+              <div className="mt-2 space-y-2">
+                {result.data.results
+                  .filter(
+                    (item) =>
+                      !item.success,
+                  )
+                  .map(
+                    (
+                      item,
+                      index,
+                    ) => (
+                      <div
+                        key={`${item.to}-${index}`}
+                        className="text-xs text-red-700"
+                      >
+                        {item.to}
+                        {item.error
+                          ? ` — ${item.error}`
+                          : ""}
+                      </div>
+                    ),
+                  )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -334,7 +620,10 @@ export function SendSmsForm({
         >
           {loading
             ? "Sending..."
-            : "Send SMS"}
+            : recipientMode ===
+                "multiple"
+              ? "Send batch SMS"
+              : "Send SMS"}
         </button>
       </div>
     </form>
