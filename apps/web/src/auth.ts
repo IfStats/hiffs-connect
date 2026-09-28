@@ -154,14 +154,27 @@ async function refreshAccessToken(
       );
 
     if (!response.ok) {
-      return {
-        ...token,
-        accessToken: undefined,
-        refreshToken: undefined,
-        authError:
-          'RefreshAccessTokenError',
-      };
-    }
+  const errorBody =
+    await response
+      .text()
+      .catch(() => '');
+
+  console.error(
+    'Hiffs Connect token refresh failed',
+    {
+      status: response.status,
+      body: errorBody,
+    },
+  );
+
+  return {
+    ...token,
+    accessToken: undefined,
+    refreshToken: undefined,
+    authError:
+      'RefreshAccessTokenError',
+  };
+}
 
     const refreshed =
       (await response.json()) as RefreshResponse;
