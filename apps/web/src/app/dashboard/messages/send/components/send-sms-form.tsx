@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { ContactsRecipientPicker } from "./contacts-recipient-picker";
+import { FileRecipientPicker } from "./file-recipient-picker";
 import { SmsComposer } from "./sms-composer";
 
 type SenderRegistration = {
@@ -61,7 +62,8 @@ type SendResult =
 type RecipientMode =
   | "single"
   | "multiple"
-  | "contacts";
+  | "contacts"
+  | "upload";
 
 export function SendSmsForm({
   businessId,
@@ -90,6 +92,11 @@ export function SendSmsForm({
   const [
     selectedContacts,
     setSelectedContacts,
+  ] = useState<string[]>([]);
+
+  const [
+    uploadedRecipients,
+    setUploadedRecipients,
   ] = useState<string[]>([]);
 
   const apiUrl =
@@ -154,7 +161,17 @@ export function SendSmsForm({
                 .filter(Boolean),
             ),
           ]
-        : manualRecipients;
+        : recipientMode === "upload"
+          ? [
+              ...new Set(
+                uploadedRecipients
+                  .map((value) =>
+                    value.trim(),
+                  )
+                  .filter(Boolean),
+              ),
+            ]
+          : manualRecipients;
 
     const text = String(
       form.get("text") ?? "",
@@ -187,8 +204,12 @@ export function SendSmsForm({
         recipientMode ===
           "contacts"
           ? "Select at least one contact."
-          : "Enter at least one recipient.",
+          : recipientMode ===
+              "upload"
+            ? "Upload a file containing at least one valid recipient."
+            : "Enter at least one recipient.",
       );
+
       return;
     }
 
@@ -424,6 +445,23 @@ export function SendSmsForm({
             >
               Contacts & Groups
             </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                changeRecipientMode(
+                  "upload",
+                )
+              }
+              className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+                recipientMode ===
+                "upload"
+                  ? "border-slate-950 bg-slate-950 text-white"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Upload File
+            </button>
           </div>
         </div>
 
@@ -516,6 +554,19 @@ export function SendSmsForm({
               />
             )}
           </>
+        )}
+
+        {recipientMode ===
+          "upload" && (
+          <FileRecipientPicker
+            value={
+              uploadedRecipients
+            }
+            onChange={
+              setUploadedRecipients
+            }
+            maxRecipients={100}
+          />
         )}
       </div>
 
@@ -707,7 +758,15 @@ export function SendSmsForm({
                       ? ""
                       : "s"
                   }`
-                : "Send batch SMS"}
+                : recipientMode ===
+                    "upload"
+                  ? `Send to ${uploadedRecipients.length} recipient${
+                      uploadedRecipients.length ===
+                      1
+                        ? ""
+                        : "s"
+                    }`
+                  : "Send batch SMS"}
         </button>
       </div>
     </form>
