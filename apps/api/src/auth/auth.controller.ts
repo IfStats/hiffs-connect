@@ -15,6 +15,10 @@ import { ResendVerificationDto } from './dto/resend-verification.dto.js';
 import { SendPhoneVerificationDto } from './dto/send-phone-verification.dto.js';
 import { VerifyPhoneDto } from './dto/verify-phone.dto.js';
 
+import {
+  RefreshTokenDto,
+} from './dto/refresh-token.dto.js';
+
 type AuthenticatedRequest = Request & {
   user: AuthUser;
 };
@@ -30,6 +34,26 @@ export class AuthController {
   ) {
     return this.authService.verifyCredentials(dto);
   }
+
+  @Post('refresh')
+refresh(
+  @Body()
+  dto: RefreshTokenDto,
+) {
+  return this.authService.refresh(
+    dto.refreshToken,
+  );
+}
+
+@Post('logout')
+logout(
+  @Body()
+  dto: RefreshTokenDto,
+) {
+  return this.authService.logout(
+    dto.refreshToken,
+  );
+}
 
   @Post('signup')
   signup(

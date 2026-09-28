@@ -7,6 +7,7 @@ import {
 
 import {
   createHash,
+  randomBytes,
   randomInt,
 } from 'node:crypto';
 
@@ -32,6 +33,12 @@ import { SendPhoneVerificationDto } from './dto/send-phone-verification.dto.js';
 import { VerifyPhoneDto } from './dto/verify-phone.dto.js';
 
 import { PhoneVerificationService } from '../phone-verification/phone-verification.service.js';
+
+const ACCESS_TOKEN_TTL_MS =
+  60 * 60 * 1000;
+
+const REFRESH_TOKEN_TTL_MS =
+  30 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -111,11 +118,18 @@ if (
       throw new UnauthorizedException('User has no active workspace');
     }
 
-    const accessToken = await this.jwtService.signAsync({
-      sub: user.id,
-      email: user.email,
-      platformRole: user.platformRole,
-    });
+    const access =
+  await this.issueAccessToken({
+    id: user.id,
+    email: user.email,
+    platformRole:
+      user.platformRole,
+  });
+
+const refresh =
+  await this.createRefreshSession(
+    user.id,
+  );
 
     return {
       id: user.id,
@@ -131,9 +145,154 @@ if (
         role: membership.role,
       })),
 
-      accessToken,
+      accessToken:
+  access.accessToken,
+
+accessTokenExpiresAt:
+  access.accessTokenExpiresAt,
+
+refreshToken:
+  refresh.refreshToken,
+
+refreshTokenExpiresAt:
+  refresh.refreshTokenExpiresAt,
     };
   }
+
+  async refresh(
+  refreshToken: string,
+) {
+  const tokenHash =
+    this.hashRefreshToken(
+      refreshToken,
+    );
+
+  const session =
+    await this.prisma.authRefreshSession.findUnique({
+      where: {
+        tokenHash,
+      },
+
+      include: {
+        user: true,
+      },
+    });
+
+  if (
+    !session ||
+    session.revokedAt ||
+    session.expiresAt.getTime() <=
+      Date.now()
+  ) {
+    throw new UnauthorizedException(
+      'Invalid or expired refresh token',
+    );
+  }
+
+  if (
+    session.user.status !==
+    'ACTIVE'
+  ) {
+    throw new UnauthorizedException(
+      'Account access is unavailable',
+    );
+  }
+
+  const now = new Date();
+
+  /*
+   * Refresh tokens are single-use.
+   * Revoke the current session before
+   * issuing its replacement.
+   */
+  await this.prisma.authRefreshSession.update({
+    where: {
+      id: session.id,
+    },
+
+    data: {
+      revokedAt: now,
+      lastUsedAt: now,
+    },
+  });
+
+  const access =
+    await this.issueAccessToken({
+      id: session.user.id,
+      email:
+        session.user.email,
+      platformRole:
+        session.user.platformRole,
+    });
+
+  const refresh =
+    await this.createRefreshSession(
+      session.user.id,
+    );
+
+  return {
+    accessToken:
+      access.accessToken,
+
+    accessTokenExpiresAt:
+      access.accessTokenExpiresAt,
+
+    refreshToken:
+      refresh.refreshToken,
+
+    refreshTokenExpiresAt:
+      refresh.refreshTokenExpiresAt,
+  };
+}
+
+async logout(
+  refreshToken: string,
+) {
+  const tokenHash =
+    this.hashRefreshToken(
+      refreshToken,
+    );
+
+  const session =
+    await this.prisma.authRefreshSession.findUnique({
+      where: {
+        tokenHash,
+      },
+
+      select: {
+        id: true,
+        revokedAt: true,
+      },
+    });
+
+  /*
+   * Logout is intentionally idempotent.
+   * An unknown/already-revoked token
+   * is treated as successfully logged out.
+   */
+  if (!session) {
+    return {
+      loggedOut: true,
+    };
+  }
+
+  if (!session.revokedAt) {
+    await this.prisma.authRefreshSession.update({
+      where: {
+        id: session.id,
+      },
+
+      data: {
+        revokedAt:
+          new Date(),
+      },
+    });
+  }
+
+  return {
+    loggedOut: true,
+  };
+}
 
   async signup(dto: SignupDto) {
     const email = dto.email.trim().toLowerCase();
@@ -833,4 +992,73 @@ async verifyPhone(
       verifiedAt,
   };
 }
+
+private hashRefreshToken(
+  token: string,
+) {
+  return createHash('sha256')
+    .update(token)
+    .digest('hex');
+}
+
+private async issueAccessToken(
+  user: {
+    id: string;
+    email: string;
+    platformRole: string | null;
+  },
+) {
+  const accessToken =
+    await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+      platformRole:
+        user.platformRole,
+    });
+
+  return {
+    accessToken,
+
+    accessTokenExpiresAt:
+      new Date(
+        Date.now() +
+          ACCESS_TOKEN_TTL_MS,
+      ).toISOString(),
+  };
+}
+
+private async createRefreshSession(
+  userId: string,
+) {
+  const refreshToken =
+    randomBytes(48).toString(
+      'base64url',
+    );
+
+  const tokenHash =
+    this.hashRefreshToken(
+      refreshToken,
+    );
+
+  const expiresAt =
+    new Date(
+      Date.now() +
+        REFRESH_TOKEN_TTL_MS,
+    );
+
+  await this.prisma.authRefreshSession.create({
+    data: {
+      userId,
+      tokenHash,
+      expiresAt,
+    },
+  });
+
+  return {
+    refreshToken,
+    refreshTokenExpiresAt:
+      expiresAt.toISOString(),
+  };
+}
+
 }
