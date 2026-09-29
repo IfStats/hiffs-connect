@@ -21,6 +21,12 @@ type SenderRegistration = {
   status: string;
 };
 
+type Wallet = {
+  currency: string;
+  balance: string | number;
+  smsUnits: number;
+};
+
 export default async function SendMessagePage() {
   const session =
     await getServerSession(
@@ -48,28 +54,49 @@ export default async function SendMessagePage() {
     process.env.HIFFS_API_URL ??
     "http://localhost:4000";
 
-  const response =
-    await fetch(
-      `${apiUrl}/sender-registrations/business/${businessId}`,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-        },
-
-        cache: "no-store",
+ const [
+  sendersResponse,
+  walletResponse,
+] = await Promise.all([
+  fetch(
+    `${apiUrl}/sender-registrations/business/${businessId}`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
       },
-    );
 
-  if (!response.ok) {
-    throw new Error(
-      "Unable to load sender registrations",
-    );
-  }
+      cache: "no-store",
+    },
+  ),
 
-  const registrations =
-    (await response.json()) as SenderRegistration[];
+  fetch(
+    `${apiUrl}/wallets/${businessId}`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
+      },
 
+      cache: "no-store",
+    },
+  ),
+]);
+
+if (
+  !sendersResponse.ok ||
+  !walletResponse.ok
+) {
+  throw new Error(
+    "Unable to load messaging account",
+  );
+}
+
+const registrations =
+  (await sendersResponse.json()) as SenderRegistration[];
+
+const wallet =
+  (await walletResponse.json()) as Wallet;
   const senders =
     registrations
       .filter(
@@ -173,19 +200,25 @@ export default async function SendMessagePage() {
           </article>
 
           <article className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-            <p className="text-sm font-semibold text-blue-950">
-              Segment billing
-            </p>
+  <p className="text-sm font-semibold text-blue-950">
+    SMS units
+  </p>
 
-            <p className="mt-2 text-sm leading-6 text-blue-800">
-              Wallet charges are based
-              on billable SMS pages,
-              not simply message count.
-              Longer or Unicode messages
-              may consume multiple SMS
-              pages.
-            </p>
-          </article>
+  <p className="mt-3 text-3xl font-semibold text-blue-950">
+    {wallet.smsUnits.toLocaleString()}
+  </p>
+
+  <p className="mt-1 text-sm text-blue-800">
+    Available units
+  </p>
+
+  <p className="mt-4 text-sm leading-6 text-blue-800">
+    Each billable SMS page
+    consumes one SMS unit.
+    Longer or Unicode messages
+    may consume multiple units.
+  </p>
+</article>
         </aside>
       </div>
     </div>

@@ -87,37 +87,6 @@ function formatDate(
   );
 }
 
-function formatBalance(
-  balance:
-    | string
-    | number,
-  currency: string,
-) {
-  const numeric =
-    Number(balance);
-
-  if (
-    Number.isNaN(numeric)
-  ) {
-    return `${balance} ${currency}`;
-  }
-
-  try {
-    return new Intl.NumberFormat(
-      'en-US',
-      {
-        style: 'currency',
-        currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      },
-    ).format(numeric);
-  } catch {
-    return `${numeric.toFixed(
-      2,
-    )} ${currency}`;
-  }
-}
 
 function StatusBadge({
   status,

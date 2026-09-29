@@ -21,6 +21,7 @@ type SenderRegistration = {
 type Wallet = {
   balance: string | number;
   currency: string;
+  smsUnits: number;
 };
 
 function formatDate(value: string) {
@@ -164,14 +165,12 @@ export default async function DashboardPage() {
     },
 
     {
-      label: "Wallet balance",
-      value:
-        `${wallet.currency} ${Number(
-          wallet.balance,
-        ).toFixed(3)}`,
-      detail:
-        "Available messaging balance",
-    },
+  label: "SMS units",
+  value:
+    wallet.smsUnits.toLocaleString(),
+  detail:
+    "Available messaging units",
+},
   ];
 
   return (
