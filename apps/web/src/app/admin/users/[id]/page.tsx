@@ -8,6 +8,7 @@ import {
 import { authOptions } from '@/auth';
 import { UserStatusControls } from './user-status-controls';
 import { PlatformRoleControls } from './platform-role-controls';
+import { EmailVerificationControls } from './email-verification-controls';
 
 type AccountStatus =
   | 'ACTIVE'
@@ -545,6 +546,14 @@ export default async function AdminUserPage({
           </div>
         )}
       </section>
+
+      <EmailVerificationControls
+  userId={user.id}
+  email={user.email}
+  verified={Boolean(
+    user.emailVerified,
+  )}
+/>
 
       <UserStatusControls
   userId={user.id}

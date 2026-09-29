@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { AuthzModule } from './authz/authz.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { ContactsModule } from './contacts/contacts.module.js';
+import { JobsModule } from './jobs/jobs.module.js';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ContactsModule } from './contacts/contacts.module.js';
     AuthzModule,
     AdminModule,
     ContactsModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

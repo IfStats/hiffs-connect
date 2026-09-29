@@ -5,6 +5,8 @@ import {
   redirect,
 } from 'next/navigation';
 
+import SmsUnitActions from './sms-unit-actions';
+
 import { authOptions } from '@/auth';
 
 type BusinessStatus =
@@ -51,14 +53,16 @@ type AdminBusiness = {
   updatedAt: string;
 
   wallet: {
-    id: string;
-    currency: string;
-    balance:
-      | string
-      | number;
+  id: string;
+  currency: string;
+  balance:
+    | string
+    | number;
 
-    updatedAt: string;
-  } | null;
+  smsUnits: number;
+
+  updatedAt: string;
+} | null;
 
   memberships: BusinessMember[];
 
@@ -298,28 +302,21 @@ export default async function AdminBusinessPage({
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-500">
-            Wallet balance
-          </p>
+  <p className="text-sm text-slate-500">
+    SMS units
+  </p>
 
-          <p className="mt-3 text-2xl font-semibold tracking-tight">
-            {business.wallet
-              ? formatBalance(
-                  business
-                    .wallet
-                    .balance,
-                  business
-                    .wallet
-                    .currency,
-                )
-              : '—'}
-          </p>
+  <p className="mt-3 text-3xl font-semibold tracking-tight">
+    {business.wallet
+      ?.smsUnits
+      ?.toLocaleString() ??
+      '0'}
+  </p>
 
-          <p className="mt-2 text-xs text-slate-400">
-            Available messaging
-            balance
-          </p>
-        </article>
+  <p className="mt-2 text-xs text-slate-400">
+    Available messaging units
+  </p>
+</article>
 
         <article className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="text-sm text-slate-500">
@@ -614,19 +611,30 @@ export default async function AdminBusinessPage({
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-slate-950">
-          Administrative actions
-        </h2>
+  <h2 className="text-lg font-semibold text-slate-950">
+    SMS unit management
+  </h2>
 
-        <p className="mt-2 text-sm leading-6 text-slate-500">
-          Wallet adjustments,
-          account suspension and
-          other privileged actions
-          will be added here with
-          explicit confirmation and
-          audit information.
-        </p>
-      </section>
+  <p className="mt-2 text-sm leading-6 text-slate-500">
+    Credit or deduct SMS
+    units for this business.
+    Each SMS segment consumes
+    one unit.
+  </p>
+
+  <div className="mt-6 max-w-xl">
+    <SmsUnitActions
+      businessId={
+        business.id
+      }
+      initialSmsUnits={
+        business.wallet
+          ?.smsUnits ??
+        0
+      }
+    />
+  </div>
+</section>
     </div>
   );
 }

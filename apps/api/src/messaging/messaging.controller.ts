@@ -128,27 +128,6 @@ getSummary(
     businessId,
   );
 }
-
-@Get(
-  'business/:businessId/messages/:id/routing-attempts',
-)
-@UseGuards(
-  ApiAuthGuard,
-  BusinessPermissionGuard,
-)
-@RequirePermissions(Permission.MESSAGE_READ)
-getRoutingAttempts(
-  @Param('businessId')
-  businessId: string,
-
-  @Param('id')
-  id: string,
-) {
-  return this.messagingService.getRoutingAttempts(
-    businessId,
-    id,
-  );
-}
   @Post('webhooks/infobip')
 @UseGuards(InfobipWebhookGuard)
 handleInfobipDeliveryReport(

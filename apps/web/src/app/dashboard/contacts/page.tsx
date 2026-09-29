@@ -75,12 +75,30 @@ export default async function ContactsPage({
   const accessToken =
     session.user.accessToken;
 
-  if (
-    !businessId ||
-    !accessToken
-  ) {
-    redirect("/dashboard");
-  }
+  console.log(
+  "Contacts session context",
+  {
+    hasBusinessId:
+      Boolean(businessId),
+
+    hasAccessToken:
+      Boolean(accessToken),
+
+    businessId:
+      businessId ?? null,
+
+    businessRole:
+      session.user.businessRole ??
+      null,
+  },
+);
+
+if (
+  !businessId ||
+  !accessToken
+) {
+  redirect("/dashboard");
+}
 
   const apiUrl =
     process.env.HIFFS_API_URL ??
@@ -147,13 +165,44 @@ export default async function ContactsPage({
   ]);
 
   if (
-    !contactsResponse.ok ||
-    !groupsResponse.ok
-  ) {
-    throw new Error(
-      "Unable to load contact information",
-    );
-  }
+  !contactsResponse.ok ||
+  !groupsResponse.ok
+) {
+  const [
+    contactsError,
+    groupsError,
+  ] = await Promise.all([
+    contactsResponse
+      .text()
+      .catch(() => ""),
+    groupsResponse
+      .text()
+      .catch(() => ""),
+  ]);
+
+  console.error(
+    "Contacts page API failure",
+    {
+      contacts: {
+        status:
+          contactsResponse.status,
+        body:
+          contactsError,
+      },
+
+      groups: {
+        status:
+          groupsResponse.status,
+        body:
+          groupsError,
+      },
+    },
+  );
+
+  throw new Error(
+    "Unable to load contact information",
+  );
+}
 
   const contacts =
     (await contactsResponse.json()) as Contact[];

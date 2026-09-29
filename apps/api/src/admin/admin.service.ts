@@ -6,11 +6,16 @@ import {
 
 import {
   Prisma,
+  SmsUnitTransactionType,
   WalletTransactionStatus,
   WalletTransactionType,
 } from '@prisma/client';
 
 import { AccountStatus, PlatformRole } from '@prisma/client';
+
+import { SmsUnitOperationDto } from './dto/sms-unit-operation.dto.js';
+
+import { AuthService } from '../auth/auth.service.js';
 
 import { UpdateAccountStatusDto } from './dto/update-account-status.dto.js';
 import { UpdatePlatformRoleDto } from './dto/update-platform-role.dto.js';
@@ -20,7 +25,10 @@ import { WalletOperationDto } from './dto/wallet-operation.dto.js';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+   ) {}
 
   async listBusinesses() {
     return this.prisma.business.findMany({
@@ -214,6 +222,14 @@ export class AdminService {
 
     return user;
   }
+
+  async resendUserEmailVerification(
+  userId: string,
+) {
+  return this.authService.resendVerificationForUser(
+    userId,
+  );
+}
 
   async getWalletTransactions(businessId: string) {
     const wallet = await this.prisma.wallet.findUnique({
@@ -606,4 +622,233 @@ export class AdminService {
       },
     });
   }
+
+  async creditSmsUnits(
+  businessId: string,
+  performedByUserId: string,
+  dto: SmsUnitOperationDto,
+) {
+  return this.prisma.$transaction(
+    async (tx) => {
+      const wallet =
+        await tx.wallet.findUnique({
+          where: {
+            businessId,
+          },
+        });
+
+      if (!wallet) {
+        throw new NotFoundException(
+          'Business wallet not found',
+        );
+      }
+
+      await tx.wallet.update({
+        where: {
+          id: wallet.id,
+        },
+
+        data: {
+          smsUnits: {
+            increment: dto.units,
+          },
+        },
+      });
+
+      const updatedWallet =
+        await tx.wallet.findUniqueOrThrow({
+          where: {
+            id: wallet.id,
+          },
+        });
+
+      const balanceAfter =
+        updatedWallet.smsUnits;
+
+      const balanceBefore =
+        balanceAfter - dto.units;
+
+      const transaction =
+        await tx.smsUnitTransaction.create({
+          data: {
+            walletId: wallet.id,
+
+            type:
+              SmsUnitTransactionType.ADMIN_CREDIT,
+
+            status:
+              WalletTransactionStatus.COMPLETED,
+
+            units: dto.units,
+
+            balanceBefore,
+            balanceAfter,
+
+            reference:
+              dto.reference,
+
+            description:
+              dto.reason,
+
+            performedByUserId,
+          },
+        });
+
+      return {
+        businessId,
+        walletId:
+          updatedWallet.id,
+
+        creditedUnits:
+          dto.units,
+
+        balanceBefore,
+        balanceAfter,
+
+        transaction,
+      };
+    },
+  );
+}
+
+async debitSmsUnits(
+  businessId: string,
+  performedByUserId: string,
+  dto: SmsUnitOperationDto,
+) {
+  return this.prisma.$transaction(
+    async (tx) => {
+      const wallet =
+        await tx.wallet.findUnique({
+          where: {
+            businessId,
+          },
+        });
+
+      if (!wallet) {
+        throw new NotFoundException(
+          'Business wallet not found',
+        );
+      }
+
+      const result =
+        await tx.wallet.updateMany({
+          where: {
+            id: wallet.id,
+
+            smsUnits: {
+              gte: dto.units,
+            },
+          },
+
+          data: {
+            smsUnits: {
+              decrement: dto.units,
+            },
+          },
+        });
+
+      if (result.count !== 1) {
+        throw new BadRequestException(
+          'Insufficient SMS units',
+        );
+      }
+
+      const updatedWallet =
+        await tx.wallet.findUniqueOrThrow({
+          where: {
+            id: wallet.id,
+          },
+        });
+
+      const balanceAfter =
+        updatedWallet.smsUnits;
+
+      const balanceBefore =
+        balanceAfter + dto.units;
+
+      const transaction =
+        await tx.smsUnitTransaction.create({
+          data: {
+            walletId: wallet.id,
+
+            type:
+              SmsUnitTransactionType.ADMIN_DEBIT,
+
+            status:
+              WalletTransactionStatus.COMPLETED,
+
+            units:
+              -dto.units,
+
+            balanceBefore,
+            balanceAfter,
+
+            reference:
+              dto.reference,
+
+            description:
+              dto.reason,
+
+            performedByUserId,
+          },
+        });
+
+      return {
+        businessId,
+        walletId:
+          updatedWallet.id,
+
+        debitedUnits:
+          dto.units,
+
+        balanceBefore,
+        balanceAfter,
+
+        transaction,
+      };
+    },
+  );
+}
+
+async getSmsUnitTransactions(
+  businessId: string,
+) {
+  const wallet =
+    await this.prisma.wallet.findUnique({
+      where: {
+        businessId,
+      },
+    });
+
+  if (!wallet) {
+    throw new NotFoundException(
+      'Business wallet not found',
+    );
+  }
+
+  return this.prisma.smsUnitTransaction.findMany({
+    where: {
+      walletId:
+        wallet.id,
+    },
+
+    orderBy: {
+      createdAt:
+        'desc',
+    },
+
+    take: 100,
+
+    include: {
+      performedByUser: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      },
+    },
+  });
+}
 }

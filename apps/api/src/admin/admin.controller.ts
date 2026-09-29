@@ -22,6 +22,8 @@ import { WalletOperationDto } from './dto/wallet-operation.dto.js';
 import { UpdateAccountStatusDto } from './dto/update-account-status.dto.js';
 import { UpdatePlatformRoleDto } from './dto/update-platform-role.dto.js';
 
+import { SmsUnitOperationDto } from './dto/sms-unit-operation.dto.js';
+
 type AuthenticatedRequest = Request & {
   user: AuthUser;
 };
@@ -119,4 +121,69 @@ export class AdminController {
   ) {
     return this.adminService.updatePlatformRole(id, request.user.id, dto);
   }
+
+  @Post('users/:id/resend-email-verification')
+@RequirePermissions(Permission.USER_MANAGE)
+resendUserEmailVerification(
+  @Param('id') id: string,
+) {
+  return this.adminService.resendUserEmailVerification(
+    id,
+  );
+}
+
+@Get('businesses/:businessId/sms-units/transactions')
+@RequirePermissions(
+  Permission.WALLET_TRANSACTION_READ,
+)
+getSmsUnitTransactions(
+  @Param('businessId')
+  businessId: string,
+) {
+  return this.adminService.getSmsUnitTransactions(
+    businessId,
+  );
+}
+
+@Post('businesses/:businessId/sms-units/credit')
+@RequirePermissions(
+  Permission.WALLET_ADMIN_CREDIT,
+)
+creditSmsUnits(
+  @Param('businessId')
+  businessId: string,
+
+  @Body()
+  dto: SmsUnitOperationDto,
+
+  @Req()
+  request: AuthenticatedRequest,
+) {
+  return this.adminService.creditSmsUnits(
+    businessId,
+    request.user.id,
+    dto,
+  );
+}
+
+@Post('businesses/:businessId/sms-units/debit')
+@RequirePermissions(
+  Permission.WALLET_ADMIN_DEBIT,
+)
+debitSmsUnits(
+  @Param('businessId')
+  businessId: string,
+
+  @Body()
+  dto: SmsUnitOperationDto,
+
+  @Req()
+  request: AuthenticatedRequest,
+) {
+  return this.adminService.debitSmsUnits(
+    businessId,
+    request.user.id,
+    dto,
+  );
+}
 }

@@ -42,10 +42,6 @@ export class CreatePricingDto {
   @Min(0)
   retailPrice!: number;
 
-  @IsString()
-  @Length(3, 3)
-  currency!: string;
-
   @IsOptional()
   @IsInt()
   @Min(0)

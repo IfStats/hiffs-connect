@@ -12,6 +12,12 @@ type VerificationEmailInput = {
   code: string;
 };
 
+type VerificationReminderEmailInput = {
+  to: string;
+  name?: string | null;
+  reminderNumber: 1 | 2 | 3;
+};
+
 @Injectable()
 export class EmailService {
   constructor(
@@ -201,4 +207,210 @@ export class EmailService {
         null,
     };
   }
+
+  async sendVerificationReminderEmail(
+  input: VerificationReminderEmailInput,
+) {
+  const apiKey =
+    this.configService.get<string>(
+      'RESEND_API_KEY',
+    );
+
+  const from =
+    this.configService.get<string>(
+      'EMAIL_FROM',
+    );
+
+  const configuredWebUrl =
+    this.configService.get<string>(
+      'HIFFS_WEB_URL',
+    );
+
+  const webUrl =
+    configuredWebUrl?.replace(
+      /\/+$/,
+      '',
+    ) ??
+    (process.env.NODE_ENV ===
+    'production'
+      ? null
+      : 'http://localhost:3000');
+
+  if (
+    !apiKey ||
+    !from
+  ) {
+    throw new InternalServerErrorException(
+      'Transactional email is not configured',
+    );
+  }
+
+  if (!webUrl) {
+    throw new InternalServerErrorException(
+      'HIFFS_WEB_URL is not configured',
+    );
+  }
+
+  const resend =
+    new Resend(apiKey);
+
+  const name =
+    input.name?.trim() ||
+    'there';
+
+  const safeName =
+    this.escapeHtml(name);
+
+  const verificationUrl =
+    `${webUrl}/verify-email?email=${encodeURIComponent(
+      input.to,
+    )}`;
+
+  const reminderLabel =
+    input.reminderNumber === 1
+      ? 'Reminder'
+      : input.reminderNumber === 2
+        ? 'Second reminder'
+        : 'Final reminder';
+
+  const {
+    data,
+    error,
+  } = await resend.emails.send({
+    from,
+
+    to: [
+      input.to,
+    ],
+
+    subject:
+      `${reminderLabel}: verify your Hiffs Connect email`,
+
+    html: `
+      <div
+        style="
+          font-family:Arial,sans-serif;
+          max-width:600px;
+          margin:0 auto;
+          padding:32px;
+          color:#0f172a;
+        "
+      >
+        <div
+          style="
+            font-size:20px;
+            font-weight:700;
+            margin-bottom:24px;
+          "
+        >
+          Hiffs Connect
+        </div>
+
+        <h1
+          style="
+            font-size:28px;
+            margin-bottom:16px;
+          "
+        >
+          Verify your email
+        </h1>
+
+        <p
+          style="
+            font-size:16px;
+            line-height:1.6;
+            color:#475569;
+          "
+        >
+          Hi ${safeName},
+        </p>
+
+        <p
+          style="
+            font-size:16px;
+            line-height:1.6;
+            color:#475569;
+          "
+        >
+          Your Hiffs Connect account is still
+          waiting for email verification.
+        </p>
+
+        <p
+          style="
+            font-size:16px;
+            line-height:1.6;
+            color:#475569;
+          "
+        >
+          Open the verification page below.
+          If your previous code has expired,
+          select <strong>Send another code</strong>
+          to receive a fresh 10-minute code.
+        </p>
+
+        <div
+          style="
+            margin:32px 0;
+          "
+        >
+          <a
+            href="${verificationUrl}"
+            style="
+              display:inline-block;
+              padding:14px 22px;
+              border-radius:10px;
+              background:#2563eb;
+              color:#ffffff;
+              text-decoration:none;
+              font-weight:700;
+            "
+          >
+            Verify email
+          </a>
+        </div>
+
+        <p
+          style="
+            font-size:14px;
+            line-height:1.6;
+            color:#64748b;
+          "
+        >
+          If you did not create a Hiffs Connect
+          account, you can ignore this email.
+        </p>
+
+        <p
+          style="
+            margin-top:32px;
+            font-size:12px;
+            color:#94a3b8;
+          "
+        >
+          Hiffs Connect ·
+          Hiffs Global Enterprises
+        </p>
+      </div>
+    `,
+
+    text:
+      `Hi ${name},\n\n` +
+      `Your Hiffs Connect account is still waiting for email verification.\n\n` +
+      `Open this page to continue:\n${verificationUrl}\n\n` +
+      `If your previous code has expired, select "Send another code" to receive a fresh verification code.`,
+  });
+
+  if (error) {
+    throw new InternalServerErrorException(
+      `Verification reminder email could not be sent: ${error.message}`,
+    );
+  }
+
+  return {
+    id:
+      data?.id ??
+      null,
+  };
+}
 }

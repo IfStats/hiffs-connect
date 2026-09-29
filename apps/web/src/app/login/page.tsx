@@ -1,7 +1,12 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { signIn } from 'next-auth/react';
+
+import {
+  getSession,
+  signIn,
+} from 'next-auth/react';
+
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -15,87 +20,95 @@ export default function LoginPage() {
     useState(false);
 
   async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
+  event: FormEvent<HTMLFormElement>,
+) {
+  event.preventDefault();
 
-    setError(null);
-    setLoading(true);
+  setError(null);
+  setLoading(true);
 
-    const formData =
-      new FormData(event.currentTarget);
+  const formData =
+    new FormData(event.currentTarget);
 
-    const email =
-      String(formData.get('email') ?? '');
+  const email =
+    String(formData.get('email') ?? '');
 
-    const password =
-      String(formData.get('password') ?? '');
+  const password =
+    String(formData.get('password') ?? '');
 
-    const result =
-      await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      });
+  const result =
+    await signIn('credentials', {
+      email,
+      password,
+      redirect: false,
+    });
 
+  if (!result?.ok) {
     setLoading(false);
 
-    if (!result?.ok) {
-  const authError =
-    result?.error ?? '';
+    const authError =
+      result?.error ?? '';
 
-  const normalizedEmail =
-    email
-      .trim()
-      .toLowerCase();
-
-  if (
-    authError.includes(
-      'EMAIL_NOT_VERIFIED',
-    )
-  ) {
-    router.push(
-      `/verify-email?email=${encodeURIComponent(
-        normalizedEmail,
-      )}`,
-    );
-
-    return;
-  }
-
-  if (
-    authError.includes(
-      'PHONE_NOT_VERIFIED',
-    )
-  ) {
-    const phoneVerificationEnabled =
-      process.env
-        .NEXT_PUBLIC_PHONE_VERIFICATION_ENABLED ===
-      'true';
+    const normalizedEmail =
+      email.trim().toLowerCase();
 
     if (
-      phoneVerificationEnabled
+      authError.includes(
+        'EMAIL_NOT_VERIFIED',
+      )
     ) {
       router.push(
-        `/verify-phone?email=${encodeURIComponent(
+        `/verify-email?email=${encodeURIComponent(
           normalizedEmail,
         )}`,
       );
 
       return;
     }
+
+    if (
+      authError.includes(
+        'PHONE_NOT_VERIFIED',
+      )
+    ) {
+      const phoneVerificationEnabled =
+        process.env
+          .NEXT_PUBLIC_PHONE_VERIFICATION_ENABLED ===
+        'true';
+
+      if (phoneVerificationEnabled) {
+        router.push(
+          `/verify-phone?email=${encodeURIComponent(
+            normalizedEmail,
+          )}`,
+        );
+
+        return;
+      }
+    }
+
+    setError(
+      'Invalid email or password',
+    );
+
+    return;
   }
 
-  setError(
-    'Invalid email or password',
-  );
+  const session = await getSession();
 
-  return;
-}
+  setLoading(false);
 
+  if (
+    session?.user?.platformRole ===
+    'SUPER_ADMIN'
+  ) {
+    router.push('/admin');
+  } else {
     router.push('/dashboard');
-    router.refresh();
   }
+
+  router.refresh();
+}
 
   return (
   <main className="grid min-h-screen bg-white lg:grid-cols-2">

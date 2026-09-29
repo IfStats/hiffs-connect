@@ -248,3 +248,84 @@ export async function updateUserPlatformRole(
         : 'Platform role removed.',
   };
 }
+
+export async function resendUserEmailVerification(
+  userId: string,
+): Promise<ActionResult> {
+  const session =
+    await getSuperAdminSession();
+
+  if (!session) {
+    return {
+      ok: false,
+      message:
+        'Super Admin authentication is required.',
+    };
+  }
+
+  const apiBaseUrl =
+    process.env.HIFFS_API_URL ??
+    'http://localhost:4000';
+
+  const response =
+    await fetch(
+      `${apiBaseUrl}/admin/users/${encodeURIComponent(
+        userId,
+      )}/resend-email-verification`,
+      {
+        method: 'POST',
+
+        headers: {
+          Authorization:
+            `Bearer ${session.user.accessToken}`,
+        },
+
+        cache: 'no-store',
+      },
+    );
+
+  const payload = (await response
+    .json()
+    .catch(() => null)) as {
+    accepted?: boolean;
+    alreadyVerified?: boolean;
+    expiresAt?: string;
+    message?: string | string[];
+  } | null;
+
+  if (!response.ok) {
+    return {
+      ok: false,
+
+      message:
+        Array.isArray(
+          payload?.message,
+        )
+          ? payload.message.join(
+              ', ',
+            )
+          : payload?.message ??
+            'Unable to resend verification email.',
+    };
+  }
+
+  revalidatePath(
+    `/admin/users/${userId}`,
+  );
+
+  if (
+    payload?.alreadyVerified
+  ) {
+    return {
+      ok: true,
+      message:
+        'This email address is already verified.',
+    };
+  }
+
+  return {
+    ok: true,
+    message:
+      'A new verification email has been sent. The verification code expires in 10 minutes.',
+  };
+}

@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import {
+  currencyForCountry,
+} from '../common/country-currency.js';
+
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma.service.js';
@@ -32,13 +36,21 @@ export class WalletsService {
     });
 
     if (!wallet) {
-      wallet = await this.prisma.wallet.create({
-        data: {
-          businessId,
-          currency: 'USD',
-          balance: new Prisma.Decimal(0),
-        },
-      });
+      wallet =
+  await this.prisma.wallet.create({
+    data: {
+      businessId,
+
+      currency:
+        business.billingCurrency ??
+        currencyForCountry(
+          business.countryCode,
+        ),
+
+      balance:
+        new Prisma.Decimal(0),
+    },
+  });
     }
 
     return wallet;
