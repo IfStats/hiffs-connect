@@ -10,7 +10,13 @@ type SmsEncoding =
   | "GSM7"
   | "UCS2";
 
-type SmsUsage = {
+type Props = {
+  onUsageChange?: (
+    usage: SmsUsage,
+  ) => void;
+};  
+
+export type SmsUsage = {
   encoding: SmsEncoding;
   characterCount: number;
   unitsUsed: number;
@@ -100,7 +106,9 @@ function calculateSmsUsage(
   };
 }
 
-export function SmsComposer() {
+export function SmsComposer({
+  onUsageChange,
+}: Props) {
   const [text, setText] =
     useState("");
 
@@ -112,12 +120,19 @@ export function SmsComposer() {
     );
 
   function handleChange(
-    event: ChangeEvent<HTMLTextAreaElement>,
-  ) {
-    setText(
-      event.target.value,
-    );
-  }
+  event: ChangeEvent<HTMLTextAreaElement>,
+) {
+  const nextText =
+    event.target.value;
+
+  setText(nextText);
+
+  onUsageChange?.(
+    calculateSmsUsage(
+      nextText,
+    ),
+  );
+}
 
   const pageLabel =
     usage.segmentCount === 1

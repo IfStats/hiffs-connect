@@ -157,6 +157,7 @@ const wallet =
               accessToken
             }
             senders={senders}
+            smsUnits={wallet.smsUnits}
           />
         </section>
 

@@ -24,6 +24,30 @@ type Wallet = {
   smsUnits: number;
 };
 
+type SmsUnitTransaction = {
+  id: string;
+  type:
+    | "ADMIN_CREDIT"
+    | "ADMIN_DEBIT"
+    | "MESSAGE_DEBIT"
+    | "REFUND"
+    | "ADJUSTMENT";
+  status: string;
+  units: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  description: string | null;
+  reference: string | null;
+  createdAt: string;
+
+  message: {
+    id: string;
+    recipient: string;
+    status: string;
+    segmentCount: number | null;
+  } | null;
+};
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GH", {
     dateStyle: "medium",
@@ -62,44 +86,63 @@ export default async function DashboardPage() {
   };
 
   const [
-    messagesResponse,
-    sendersResponse,
-    walletResponse,
-  ] = await Promise.all([
-    fetch(
-      `${apiUrl}/messaging/business/${businessId}/messages`,
-      {
-        headers,
-        cache: "no-store",
-      },
-    ),
+  messagesResponse,
+  sendersResponse,
+  walletResponse,
+  smsUnitsResponse,
+] = await Promise.all([
+  fetch(
+    `${apiUrl}/messaging/business/${businessId}/messages`,
+    {
+      headers,
+      cache: "no-store",
+    },
+  ),
 
-    fetch(
-      `${apiUrl}/sender-registrations/business/${businessId}`,
-      {
-        headers,
-        cache: "no-store",
-      },
-    ),
+  fetch(
+    `${apiUrl}/sender-registrations/business/${businessId}`,
+    {
+      headers,
+      cache: "no-store",
+    },
+  ),
 
-    fetch(
-      `${apiUrl}/wallets/${businessId}`,
-      {
-        headers,
-        cache: "no-store",
-      },
-    ),
-  ]);
+  fetch(
+    `${apiUrl}/wallets/${businessId}`,
+    {
+      headers,
+      cache: "no-store",
+    },
+  ),
+
+  fetch(
+    `${apiUrl}/wallets/${businessId}/sms-units/transactions`,
+    {
+      headers,
+      cache: "no-store",
+    },
+  ),
+]);
 
   if (
     !messagesResponse.ok ||
     !sendersResponse.ok ||
-    !walletResponse.ok
+    !walletResponse.ok  ||
+    !smsUnitsResponse.ok
   ) {
     throw new Error(
       "Unable to load dashboard data",
     );
   }
+
+  const smsUnitTransactions =
+  (await smsUnitsResponse.json()) as SmsUnitTransaction[];
+
+const recentSmsUnitTransactions =
+  smsUnitTransactions.slice(
+    0,
+    8,
+  );
 
   const messages =
     (await messagesResponse.json()) as Message[];
@@ -346,6 +389,116 @@ export default async function DashboardPage() {
           </div>
         </article>
       </section>
+      
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+  <div className="border-b border-slate-200 px-6 py-5">
+    <h2 className="font-semibold text-slate-950">
+      SMS unit activity
+    </h2>
+
+    <p className="mt-1 text-sm text-slate-500">
+      Recent credits, message usage
+      and refunds.
+    </p>
+  </div>
+
+  {recentSmsUnitTransactions.length ===
+  0 ? (
+    <div className="px-6 py-12 text-center text-sm text-slate-500">
+      No SMS unit activity yet.
+    </div>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-6 py-4 font-medium">
+              Activity
+            </th>
+
+            <th className="px-6 py-4 font-medium">
+              Units
+            </th>
+
+            <th className="px-6 py-4 font-medium">
+              Balance
+            </th>
+
+            <th className="px-6 py-4 font-medium">
+              Details
+            </th>
+
+            <th className="px-6 py-4 font-medium">
+              Time
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {recentSmsUnitTransactions.map(
+            (transaction) => (
+              <tr
+                key={
+                  transaction.id
+                }
+                className="border-t border-slate-100"
+              >
+                <td className="px-6 py-4 font-medium text-slate-900">
+                  {transaction.type ===
+                  "MESSAGE_DEBIT"
+                    ? "SMS sent"
+                    : transaction.type ===
+                        "ADMIN_CREDIT"
+                      ? "Units added"
+                      : transaction.type ===
+                          "ADMIN_DEBIT"
+                        ? "Units deducted"
+                        : transaction.type ===
+                            "REFUND"
+                          ? "Units refunded"
+                          : "Adjustment"}
+                </td>
+
+                <td
+                  className={`px-6 py-4 font-semibold ${
+                    transaction.units >
+                    0
+                      ? "text-emerald-700"
+                      : "text-slate-900"
+                  }`}
+                >
+                  {transaction.units >
+                  0
+                    ? "+"
+                    : ""}
+                  {transaction.units.toLocaleString()}
+                </td>
+
+                <td className="px-6 py-4 text-slate-500">
+                  {transaction.balanceAfter.toLocaleString()}
+                </td>
+
+                <td className="px-6 py-4 text-slate-500">
+                  {transaction.message
+                    ? `SMS to ${transaction.message.recipient}`
+                    : transaction.description ??
+                      "—"}
+                </td>
+
+                <td className="px-6 py-4 text-slate-500">
+                  {formatDate(
+                    transaction.createdAt,
+                  )}
+                </td>
+              </tr>
+            ),
+          )}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
+
     </div>
   );
 }

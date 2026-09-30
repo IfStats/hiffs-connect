@@ -646,45 +646,157 @@ export class MessagingService {
     }
     throw new InternalServerErrorException(`Unsupported messaging provider: ${provider}`);
   }
-  async sendBatchSms(dto: SendBatchSmsDto, authenticatedBusinessId: string) {
-    const recipients = [
-      ...new Set(dto.recipients.map((recipient) => recipient.trim())),
-    ];
-    const results = [];
-    for (const to of recipients) {
-      try {
-        const result = await this.sendSms({
-          to,
-          text: dto.text,
-          senderRegistrationId: dto.senderRegistrationId,
-        }, authenticatedBusinessId);
-        results.push({
-          to,
-          success: true,
-          id: result.id,
-          status: result.status,
-          segmentCount: result.segmentCount,
-          customerPrice: result.customerPrice,
-          currency: result.currency,
-        });
-      }
-      catch (error) {
-        results.push({
-          to,
-          success: false,
-          error: error instanceof Error
+  async sendBatchSms(
+  dto: SendBatchSmsDto,
+  authenticatedBusinessId: string,
+) {
+  const recipients = [
+    ...new Set(
+      dto.recipients
+        .map((recipient) =>
+          recipient.trim(),
+        )
+        .filter(Boolean),
+    ),
+  ];
+
+  if (recipients.length === 0) {
+    throw new BadRequestException(
+      'At least one recipient is required',
+    );
+  }
+
+  const smsUsage =
+    calculateSmsUsage(
+      dto.text,
+    );
+
+  const requiredSmsUnits =
+    smsUsage.segmentCount *
+    recipients.length;
+
+  const wallet =
+    await this.prisma.wallet.findUnique({
+      where: {
+        businessId:
+          authenticatedBusinessId,
+      },
+
+      select: {
+        id: true,
+        smsUnits: true,
+      },
+    });
+
+  if (!wallet) {
+    throw new BadRequestException(
+      'Business wallet not found',
+    );
+  }
+
+  /*
+   * Batch preflight.
+   *
+   * This prevents a batch from starting when
+   * the currently available unit balance is
+   * already insufficient for the full batch.
+   *
+   * Each individual sendSms() still performs
+   * the authoritative atomic unit debit, so
+   * concurrent activity cannot take the
+   * wallet below zero.
+   */
+  if (
+    wallet.smsUnits <
+    requiredSmsUnits
+  ) {
+    throw new BadRequestException(
+      `Insufficient SMS units. This batch requires ${requiredSmsUnits} units but only ${wallet.smsUnits} are available.`,
+    );
+  }
+
+  const results = [];
+
+  for (const to of recipients) {
+    try {
+      const result =
+        await this.sendSms(
+          {
+            to,
+
+            text:
+              dto.text,
+
+            senderRegistrationId:
+              dto.senderRegistrationId,
+          },
+
+          authenticatedBusinessId,
+        );
+
+      results.push({
+        to,
+        success: true,
+
+        id:
+          result.id,
+
+        status:
+          result.status,
+
+        segmentCount:
+          result.segmentCount,
+
+        customerPrice:
+          result.customerPrice,
+
+        currency:
+          result.currency,
+      });
+    } catch (error) {
+      /*
+       * Individual delivery/submission failures
+       * remain isolated to that recipient.
+       *
+       * sendSms() handles its own SMS-unit refund
+       * when provider submission definitively fails.
+       */
+      results.push({
+        to,
+        success: false,
+
+        error:
+          error instanceof Error
             ? error.message
             : 'SMS submission failed',
-        });
-      }
+      });
     }
-    return {
-      submitted: recipients.length,
-      successful: results.filter((result) => result.success).length,
-      failed: results.filter((result) => !result.success).length,
-      results,
-    };
   }
+
+  return {
+    submitted:
+      recipients.length,
+
+    successful:
+      results.filter(
+        (result) =>
+          result.success,
+      ).length,
+
+    failed:
+      results.filter(
+        (result) =>
+          !result.success,
+      ).length,
+
+    smsPagesPerRecipient:
+      smsUsage.segmentCount,
+
+    requiredSmsUnits,
+
+    results,
+  };
+}
   async getMessages(businessId: string) {
     return this.prisma.message.findMany({
       where: {

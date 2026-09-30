@@ -6,9 +6,16 @@ import {
   useState,
 } from "react";
 
+import {
+  useRouter,
+} from "next/navigation";
+
 import { ContactsRecipientPicker } from "./contacts-recipient-picker";
 import { FileRecipientPicker } from "./file-recipient-picker";
-import { SmsComposer } from "./sms-composer";
+import {
+  SmsComposer,
+  type SmsUsage,
+} from "./sms-composer";
 
 type SenderRegistration = {
   id: string;
@@ -21,6 +28,7 @@ type Props = {
   businessId: string;
   accessToken: string;
   senders: SenderRegistration[];
+  smsUnits: number;
 };
 
 type SingleSendResult = {
@@ -69,8 +77,16 @@ export function SendSmsForm({
   businessId,
   accessToken,
   senders,
+  smsUnits,
 }: Props) {
-  const [loading, setLoading] =
+
+  const router =
+  useRouter();
+
+const availableSmsUnits =
+  smsUnits;
+
+const [loading, setLoading] =
     useState(false);
 
   const [error, setError] =
@@ -79,7 +95,23 @@ export function SendSmsForm({
   const [result, setResult] =
     useState<SendResult | null>(
       null,
-    );
+    );  
+
+const [
+  smsUsage,
+  setSmsUsage,
+] = useState<SmsUsage>({
+  encoding: "GSM7",
+  characterCount: 0,
+  unitsUsed: 0,
+  segmentCount: 0,
+});
+
+const [
+  manualRecipientCount,
+  setManualRecipientCount,
+] = useState(0);
+
 
   const [
     recipientMode,
@@ -98,6 +130,25 @@ export function SendSmsForm({
     uploadedRecipients,
     setUploadedRecipients,
   ] = useState<string[]>([]);
+
+   const recipientCount =
+  recipientMode === "single"
+    ? 1
+    : recipientMode ===
+        "multiple"
+      ? manualRecipientCount
+      : recipientMode ===
+          "contacts"
+        ? selectedContacts.length
+        : uploadedRecipients.length;
+
+const requiredSmsUnits =
+  smsUsage.segmentCount *
+  recipientCount;
+
+const insufficientSmsUnits =
+  requiredSmsUnits >
+  availableSmsUnits;  
 
   const apiUrl =
     process.env
@@ -231,6 +282,26 @@ export function SendSmsForm({
       return;
     }
 
+    const submissionRecipientCount =
+  recipientMode === "single"
+    ? 1
+    : recipients.length;
+
+const submissionRequiredUnits =
+  smsUsage.segmentCount *
+  submissionRecipientCount;
+
+if (
+  submissionRequiredUnits >
+  availableSmsUnits
+) {
+  setError(
+    `Insufficient SMS units. This send requires ${submissionRequiredUnits.toLocaleString()} units but only ${availableSmsUnits.toLocaleString()} are available.`,
+  );
+
+  return;
+}
+
     if (!apiUrl) {
       setError(
         "API URL is not configured.",
@@ -241,6 +312,8 @@ export function SendSmsForm({
     setLoading(true);
     setError(null);
     setResult(null);
+
+    
 
     try {
       const isBatch =
@@ -308,6 +381,9 @@ export function SendSmsForm({
             data as SingleSendResult,
         });
       }
+      
+      router.refresh();
+
     } catch (caughtError) {
       setError(
         caughtError instanceof
@@ -506,6 +582,22 @@ export function SendSmsForm({
               name="recipients"
               required
               rows={7}
+              onChange={(event) => {
+  const recipients = [
+    ...new Set(
+      event.target.value
+        .split(/[\n,;]+/)
+        .map((value) =>
+          value.trim(),
+        )
+        .filter(Boolean),
+    ),
+  ];
+
+  setManualRecipientCount(
+    recipients.length,
+  );
+}}
               placeholder={
                 "+233XXXXXXXXX\n+234XXXXXXXXXX\n+233XXXXXXXXX"
               }
@@ -570,7 +662,70 @@ export function SendSmsForm({
         )}
       </div>
 
-      <SmsComposer />
+      <SmsComposer
+  onUsageChange={
+    setSmsUsage
+  }
+/>
+
+<div className="grid gap-3 sm:grid-cols-3">
+  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <p className="text-xs text-slate-500">
+      Available units
+    </p>
+
+    <p className="mt-1 text-lg font-semibold">
+      {availableSmsUnits.toLocaleString()}
+    </p>
+  </div>
+
+  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <p className="text-xs text-slate-500">
+      Required units
+    </p>
+
+    <p className="mt-1 text-lg font-semibold">
+      {requiredSmsUnits.toLocaleString()}
+    </p>
+
+    <p className="mt-1 text-xs text-slate-400">
+      {smsUsage.segmentCount} page
+      {smsUsage.segmentCount === 1
+        ? ""
+        : "s"}{" "}
+      ×{" "}
+      {recipientCount} recipient
+      {recipientCount === 1
+        ? ""
+        : "s"}
+    </p>
+  </div>
+
+  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <p className="text-xs text-slate-500">
+      After send
+    </p>
+
+    <p className="mt-1 text-lg font-semibold">
+      {Math.max(
+        0,
+        availableSmsUnits -
+          requiredSmsUnits,
+      ).toLocaleString()}
+    </p>
+  </div>
+</div>
+
+{insufficientSmsUnits && (
+  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+    You need{" "}
+    {requiredSmsUnits.toLocaleString()}{" "}
+    SMS units for this send, but
+    only{" "}
+    {availableSmsUnits.toLocaleString()}{" "}
+    are available.
+  </div>
+)}
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -740,9 +895,11 @@ export function SendSmsForm({
         <button
           type="submit"
           disabled={
-            loading ||
-            senders.length === 0
-          }
+  loading ||
+  senders.length === 0 ||
+  availableSmsUnits === 0 ||
+  insufficientSmsUnits
+}
           className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-950 px-6 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading

@@ -47,4 +47,17 @@ export class WalletsController {
       businessId,
     );
   }
+
+  @Get(':businessId/sms-units/transactions')
+@RequirePermissions(
+  Permission.WALLET_TRANSACTION_READ,
+)
+getSmsUnitTransactions(
+  @Param('businessId')
+  businessId: string,
+) {
+  return this.walletsService.getSmsUnitTransactions(
+    businessId,
+  );
+}
 }

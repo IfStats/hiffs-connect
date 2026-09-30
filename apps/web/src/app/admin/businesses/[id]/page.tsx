@@ -73,6 +73,55 @@ type AdminBusiness = {
   };
 };
 
+type AdminSmsUnitTransaction = {
+  id: string;
+
+  type:
+    | 'ADMIN_CREDIT'
+    | 'ADMIN_DEBIT'
+    | 'MESSAGE_DEBIT'
+    | 'REFUND'
+    | 'ADJUSTMENT';
+
+  status: string;
+
+  units: number;
+
+  balanceBefore: number;
+  balanceAfter: number;
+
+  reference:
+    | string
+    | null;
+
+  description:
+    | string
+    | null;
+
+  messageId:
+    | string
+    | null;
+
+  createdAt: string;
+
+  performedByUser: {
+    id: string;
+    email: string;
+    name:
+      | string
+      | null;
+  } | null;
+
+  message: {
+    id: string;
+    recipient: string;
+    status: string;
+    segmentCount:
+      | number
+      | null;
+  } | null;
+};
+
 function formatDate(
   value: string,
 ) {
@@ -168,56 +217,79 @@ export default async function AdminBusinessPage({
     process.env.HIFFS_API_URL ??
     'http://localhost:4000';
 
-  const response =
-    await fetch(
-      `${apiBaseUrl}/admin/businesses/${encodeURIComponent(
-        id,
-      )}`,
-      {
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-        },
-
-        cache: 'no-store',
+  const [
+  businessResponse,
+  transactionsResponse,
+] = await Promise.all([
+  fetch(
+    `${apiBaseUrl}/admin/businesses/${encodeURIComponent(
+      id,
+    )}`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
       },
-    );
+
+      cache: 'no-store',
+    },
+  ),
+
+  fetch(
+    `${apiBaseUrl}/admin/businesses/${encodeURIComponent(
+      id,
+    )}/sms-units/transactions`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
+      },
+
+      cache: 'no-store',
+    },
+  ),
+]);
 
   if (
-    response.status === 404
-  ) {
-    notFound();
-  }
+  businessResponse.status ===
+  404
+) {
+  notFound();
+}
 
-  if (!response.ok) {
-    return (
-      <div className="space-y-6">
-        <Link
-          href="/admin/businesses"
-          className="text-sm font-semibold text-blue-600"
-        >
-          ← Back to businesses
-        </Link>
+  if (
+  !businessResponse.ok ||
+  !transactionsResponse.ok
+) {
+  return (
+    <div className="space-y-6">
+      <Link
+        href="/admin/businesses"
+        className="text-sm font-semibold text-blue-600"
+      >
+        ← Back to businesses
+      </Link>
 
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-          <p className="font-semibold text-red-900">
-            Unable to load
-            business
-          </p>
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+        <p className="font-semibold text-red-900">
+          Unable to load
+          business
+        </p>
 
-          <p className="mt-2 text-sm leading-6 text-red-700">
-            The administration
-            API returned an error
-            while loading this
-            business.
-          </p>
-        </div>
+        <p className="mt-2 text-sm text-red-700">
+          The administration API
+          returned an error.
+        </p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   const business =
-    (await response.json()) as AdminBusiness;
+  (await businessResponse.json()) as AdminBusiness;
+
+const smsUnitTransactions =
+  (await transactionsResponse.json()) as AdminSmsUnitTransaction[];
 
   return (
     <div className="space-y-8">
@@ -327,6 +399,131 @@ export default async function AdminBusinessPage({
           </p>
         </article>
       </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+  <div className="border-b border-slate-200 px-6 py-5">
+    <h2 className="text-lg font-semibold text-slate-950">
+      SMS unit audit history
+    </h2>
+
+    <p className="mt-1 text-sm text-slate-500">
+      Credits, deductions,
+      messaging usage and refunds.
+    </p>
+  </div>
+
+  {smsUnitTransactions.length ===
+  0 ? (
+    <div className="px-6 py-12 text-center text-sm text-slate-500">
+      No SMS unit transactions.
+    </div>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[1100px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-5 py-4 font-medium">
+              Type
+            </th>
+
+            <th className="px-5 py-4 font-medium">
+              Units
+            </th>
+
+            <th className="px-5 py-4 font-medium">
+              Balance
+            </th>
+
+            <th className="px-5 py-4 font-medium">
+              Actor
+            </th>
+
+            <th className="px-5 py-4 font-medium">
+              Details
+            </th>
+
+            <th className="px-5 py-4 font-medium">
+              Reference
+            </th>
+
+            <th className="px-5 py-4 font-medium">
+              Time
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {smsUnitTransactions.map(
+            (transaction) => (
+              <tr
+                key={
+                  transaction.id
+                }
+                className="border-t border-slate-100"
+              >
+                <td className="px-5 py-4 font-medium">
+                  {
+                    transaction.type
+                  }
+                </td>
+
+                <td
+                  className={`px-5 py-4 font-semibold ${
+                    transaction.units >
+                    0
+                      ? 'text-emerald-700'
+                      : 'text-red-700'
+                  }`}
+                >
+                  {transaction.units >
+                  0
+                    ? '+'
+                    : ''}
+                  {transaction.units.toLocaleString()}
+                </td>
+
+                <td className="px-5 py-4 text-slate-600">
+                  {transaction.balanceBefore.toLocaleString()}
+                  {' → '}
+                  {transaction.balanceAfter.toLocaleString()}
+                </td>
+
+                <td className="px-5 py-4 text-slate-600">
+                  {transaction.performedByUser
+                    ? transaction
+                        .performedByUser
+                        .name ??
+                      transaction
+                        .performedByUser
+                        .email
+                    : 'System'}
+                </td>
+
+                <td className="px-5 py-4 text-slate-600">
+                  {transaction.message
+                    ? `SMS to ${transaction.message.recipient}`
+                    : transaction.description ??
+                      '—'}
+                </td>
+
+                <td className="px-5 py-4 font-mono text-xs text-slate-500">
+                  {transaction.reference ??
+                    '—'}
+                </td>
+
+                <td className="px-5 py-4 text-slate-500">
+                  {formatDate(
+                    transaction.createdAt,
+                  )}
+                </td>
+              </tr>
+            ),
+          )}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <article className="rounded-2xl border border-slate-200 bg-white p-6">

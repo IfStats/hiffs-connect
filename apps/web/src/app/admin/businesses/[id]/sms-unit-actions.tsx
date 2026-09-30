@@ -4,18 +4,26 @@ import {
   FormEvent,
   useState,
 } from 'react';
-import { useRouter } from 'next/navigation';
+
+import {
+  useRouter,
+} from 'next/navigation';
 
 type Props = {
   businessId: string;
   initialSmsUnits: number;
 };
 
+type Action =
+  | 'credit'
+  | 'debit';
+
 export default function SmsUnitActions({
   businessId,
   initialSmsUnits,
 }: Props) {
-  const router = useRouter();
+  const router =
+    useRouter();
 
   const [units, setUnits] =
     useState('');
@@ -24,9 +32,9 @@ export default function SmsUnitActions({
     useState('');
 
   const [loading, setLoading] =
-    useState<
-      'credit' | 'debit' | null
-    >(null);
+    useState<Action | null>(
+      null,
+    );
 
   const [error, setError] =
     useState<string | null>(
@@ -38,21 +46,34 @@ export default function SmsUnitActions({
       null,
     );
 
-  async function submit(
-    action:
-      | 'credit'
-      | 'debit',
+  async function handleSubmit(
     event:
       FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
-    setError(null);
-    setSuccess(null);
-    setLoading(action);
+    const nativeEvent =
+      event.nativeEvent as SubmitEvent;
+
+    const submitter =
+      nativeEvent.submitter as
+        | HTMLButtonElement
+        | null;
+
+    const action: Action =
+      submitter?.value ===
+      'debit'
+        ? 'debit'
+        : 'credit';
 
     const parsedUnits =
       Number(units);
+
+    const trimmedReason =
+      reason.trim();
+
+    setError(null);
+    setSuccess(null);
 
     if (
       !Number.isInteger(
@@ -64,9 +85,39 @@ export default function SmsUnitActions({
         'Enter a valid number of SMS units.',
       );
 
-      setLoading(null);
       return;
     }
+
+    if (!trimmedReason) {
+      setError(
+        'Reason is required.',
+      );
+
+      return;
+    }
+
+    if (
+      action === 'debit' &&
+      parsedUnits >
+        initialSmsUnits
+    ) {
+      setError(
+        `Cannot deduct ${parsedUnits.toLocaleString()} units. Current balance is ${initialSmsUnits.toLocaleString()}.`,
+      );
+
+      return;
+    }
+
+    if (
+      action === 'debit' &&
+      !window.confirm(
+        `Deduct ${parsedUnits.toLocaleString()} SMS units from this business?`,
+      )
+    ) {
+      return;
+    }
+
+    setLoading(action);
 
     try {
       const response =
@@ -89,7 +140,7 @@ export default function SmsUnitActions({
                 units:
                   parsedUnits,
                 reason:
-                  reason.trim(),
+                  trimmedReason,
               }),
           },
         );
@@ -114,10 +165,11 @@ export default function SmsUnitActions({
       setReason('');
 
       router.refresh();
-    } catch (err) {
+    } catch (caughtError) {
       setError(
-        err instanceof Error
-          ? err.message
+        caughtError instanceof
+          Error
+          ? caughtError.message
           : 'Unable to update SMS units',
       );
     } finally {
@@ -143,11 +195,8 @@ export default function SmsUnitActions({
 
       <form
         className="space-y-4"
-        onSubmit={(event) =>
-          submit(
-            'credit',
-            event,
-          )
+        onSubmit={
+          handleSubmit
         }
       >
         <div>
@@ -219,10 +268,11 @@ export default function SmsUnitActions({
         <div className="grid gap-3 sm:grid-cols-2">
           <button
             type="submit"
+            value="credit"
             disabled={
               loading !== null
             }
-            className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
+            className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ===
             'credit'
@@ -231,27 +281,12 @@ export default function SmsUnitActions({
           </button>
 
           <button
-            type="button"
+            type="submit"
+            value="debit"
             disabled={
               loading !== null
             }
-            onClick={async () => {
-              const form =
-                document.querySelector(
-                  'form',
-                );
-
-              if (form) {
-                await submit(
-                  'debit',
-                  {
-                    preventDefault:
-                      () => {},
-                  } as FormEvent<HTMLFormElement>,
-                );
-              }
-            }}
-            className="h-11 rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-700 disabled:opacity-50"
+            className="h-11 rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ===
             'debit'

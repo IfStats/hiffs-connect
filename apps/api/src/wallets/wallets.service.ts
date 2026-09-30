@@ -197,4 +197,55 @@ export class WalletsService {
       };
     });
   }
+
+  async getSmsUnitTransactions(
+  businessId: string,
+) {
+  const wallet =
+    await this.getWallet(
+      businessId,
+    );
+
+  return this.prisma.smsUnitTransaction.findMany({
+    where: {
+      walletId:
+        wallet.id,
+    },
+
+    orderBy: {
+      createdAt:
+        'desc',
+    },
+
+    take: 100,
+
+    select: {
+      id: true,
+
+      type: true,
+      status: true,
+
+      units: true,
+
+      balanceBefore: true,
+      balanceAfter: true,
+
+      reference: true,
+      description: true,
+
+      messageId: true,
+
+      createdAt: true,
+
+      message: {
+        select: {
+          id: true,
+          recipient: true,
+          status: true,
+          segmentCount: true,
+        },
+      },
+    },
+  });
+}
 }

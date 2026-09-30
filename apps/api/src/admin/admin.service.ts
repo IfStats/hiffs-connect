@@ -52,6 +52,8 @@ export class AdminService {
             id: true,
             currency: true,
             balance: true,
+            smsUnits: true,
+            updatedAt: true,
           },
         },
 
@@ -90,16 +92,27 @@ export class AdminService {
             id: true,
             currency: true,
             balance: true,
+            smsUnits: true,
             updatedAt: true,
           },
         },
 
         memberships: {
-          where: {
-            active: true,
-            emailVerified: true,
-            phoneVerified: true,
-          },
+  where: {
+    active: true,
+
+    user: {
+      is: {
+        emailVerified: {
+          not: null,
+        },
+
+        phoneVerified: {
+          not: null,
+        },
+      },
+    },
+  },
 
           select: {
             id: true,
@@ -630,18 +643,46 @@ export class AdminService {
 ) {
   return this.prisma.$transaction(
     async (tx) => {
-      const wallet =
-        await tx.wallet.findUnique({
-          where: {
-            businessId,
-          },
-        });
+      let wallet =
+  await tx.wallet.findUnique({
+    where: {
+      businessId,
+    },
+  });
 
-      if (!wallet) {
-        throw new NotFoundException(
-          'Business wallet not found',
-        );
-      }
+if (!wallet) {
+  const business =
+    await tx.business.findUnique({
+      where: {
+        id: businessId,
+      },
+
+      select: {
+        billingCurrency: true,
+      },
+    });
+
+  if (!business) {
+    throw new NotFoundException(
+      'Business not found',
+    );
+  }
+
+  wallet =
+    await tx.wallet.create({
+      data: {
+        businessId,
+
+        currency:
+          business.billingCurrency,
+
+        balance:
+          new Prisma.Decimal(0),
+
+        smsUnits: 0,
+      },
+    });
+}
 
       await tx.wallet.update({
         where: {
@@ -814,6 +855,23 @@ async debitSmsUnits(
 async getSmsUnitTransactions(
   businessId: string,
 ) {
+  const business =
+    await this.prisma.business.findUnique({
+      where: {
+        id: businessId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!business) {
+    throw new NotFoundException(
+      'Business not found',
+    );
+  }
+
   const wallet =
     await this.prisma.wallet.findUnique({
       where: {
@@ -822,9 +880,7 @@ async getSmsUnitTransactions(
     });
 
   if (!wallet) {
-    throw new NotFoundException(
-      'Business wallet not found',
-    );
+    return [];
   }
 
   return this.prisma.smsUnitTransaction.findMany({
@@ -840,12 +896,35 @@ async getSmsUnitTransactions(
 
     take: 100,
 
-    include: {
+    select: {
+      id: true,
+      type: true,
+      status: true,
+
+      units: true,
+      balanceBefore: true,
+      balanceAfter: true,
+
+      reference: true,
+      description: true,
+
+      messageId: true,
+      createdAt: true,
+
       performedByUser: {
         select: {
           id: true,
           email: true,
           name: true,
+        },
+      },
+
+      message: {
+        select: {
+          id: true,
+          recipient: true,
+          status: true,
+          segmentCount: true,
         },
       },
     },
