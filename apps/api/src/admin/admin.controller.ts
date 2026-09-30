@@ -166,6 +166,14 @@ creditSmsUnits(
   );
 }
 
+@Get('senders')
+@RequirePermissions(
+  Permission.SENDER_READ,
+)
+listSenderRegistrations() {
+  return this.adminService.listSenderRegistrations();
+}
+
 @Post('businesses/:businessId/sms-units/debit')
 @RequirePermissions(
   Permission.WALLET_ADMIN_DEBIT,

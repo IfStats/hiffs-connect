@@ -930,4 +930,45 @@ async getSmsUnitTransactions(
     },
   });
 }
+
+async listSenderRegistrations() {
+  return this.prisma.senderRegistration.findMany({
+    orderBy: {
+      createdAt: 'desc',
+    },
+
+    select: {
+      id: true,
+
+      channel: true,
+      senderType: true,
+      senderValue: true,
+
+      countryCode: true,
+      destinationCountry: true,
+
+      status: true,
+
+      useCase: true,
+      estimatedMonthlyVolume: true,
+
+      rejectionReason: true,
+
+      submittedAt: true,
+      approvedAt: true,
+      rejectedAt: true,
+
+      createdAt: true,
+      updatedAt: true,
+
+      business: {
+        select: {
+          id: true,
+          name: true,
+          countryCode: true,
+        },
+      },
+    },
+  });
+}
 }

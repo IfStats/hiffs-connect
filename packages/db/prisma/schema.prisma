@@ -101,6 +101,11 @@ enum SmsUnitTransactionType {
   ADJUSTMENT
 }
 
+enum TemplateStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 model Business {
   id              String @id @default(cuid())
   name            String
@@ -121,6 +126,7 @@ model Business {
   invitations      BusinessInvitation[]
   contacts         Contact[]
   contactGroups    ContactGroup[]
+  templates        MessageTemplate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -685,6 +691,32 @@ model ContactGroupMember {
   @@unique([groupId, contactId])
   @@index([groupId])
   @@index([contactId])
+}
+
+model MessageTemplate {
+  id String @id @default(cuid())
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  name String
+
+  channel MessageChannel @default(SMS)
+
+  content String
+
+  variables String[] @default([])
+
+  status TemplateStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@index([channel])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model SmsUnitTransaction {

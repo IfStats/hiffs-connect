@@ -83,6 +83,46 @@ export class SenderRegistrationsController {
     );
   }
 
+  @Patch(
+  'business/:businessId/:id/submit',
+)
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(
+  Permission.SENDER_MANAGE,
+)
+submitForReview(
+  @Param('businessId')
+  businessId: string,
+
+  @Param('id')
+  id: string,
+) {
+  return this.senderRegistrationsService.submitForReview(
+    businessId,
+    id,
+  );
+}
+
+@Get(':id')
+@UseGuards(
+  ApiAuthGuard,
+  PlatformPermissionGuard,
+)
+@RequirePermissions(
+  Permission.SENDER_READ,
+)
+findOne(
+  @Param('id')
+  id: string,
+) {
+  return this.senderRegistrationsService.findOne(
+    id,
+  );
+}
+
   @Patch(':id/status')
   @UseGuards(
     ApiAuthGuard,

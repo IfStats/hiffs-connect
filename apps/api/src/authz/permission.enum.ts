@@ -23,6 +23,9 @@ export enum Permission {
  CONTACT_MANAGE = 'contact.manage',
  CONTACT_IMPORT = 'contact.import',
 
+ TEMPLATE_READ = 'template.read',
+TEMPLATE_MANAGE = 'template.manage',
+
   MESSAGE_READ = 'message.read',
   MESSAGE_SEND = 'message.send',
   MESSAGE_SEND_BULK = 'message.send_bulk',

@@ -14,6 +14,9 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.CONTACT_MANAGE,
     Permission.CONTACT_IMPORT,
 
+    Permission.TEMPLATE_READ,
+    Permission.TEMPLATE_MANAGE,
+
     Permission.MEMBER_READ,
     Permission.MEMBER_INVITE,
     Permission.MEMBER_UPDATE_ROLE,
@@ -49,6 +52,9 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.CONTACT_MANAGE,
     Permission.CONTACT_IMPORT,
 
+    Permission.TEMPLATE_READ,
+    Permission.TEMPLATE_MANAGE,
+
     Permission.MEMBER_READ,
     Permission.MEMBER_INVITE,
     Permission.MEMBER_UPDATE_ROLE,
@@ -79,6 +85,8 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.BUSINESS_READ,
     
     Permission.CONTACT_READ,
+
+    Permission.TEMPLATE_READ,
 
     Permission.MEMBER_READ,
 
@@ -117,6 +125,9 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.CONTACT_MANAGE,
     Permission.CONTACT_IMPORT,
 
+    Permission.TEMPLATE_READ,
+    Permission.TEMPLATE_MANAGE,
+
     Permission.MESSAGE_READ,
     Permission.MESSAGE_SEND,
     Permission.MESSAGE_SEND_BULK,
@@ -132,6 +143,8 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.MEMBER_READ,
     
     Permission.CONTACT_READ,
+
+    Permission.TEMPLATE_READ,
     
     Permission.WALLET_READ,
     Permission.WALLET_TRANSACTION_READ,

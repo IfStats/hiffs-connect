@@ -3,71 +3,208 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
 import { PrismaService } from '../prisma.service.js';
-import { CreateSenderRegistrationDto } from './dto/create-sender-registration.dto.js';
+
+import {
+  CreateSenderRegistrationDto,
+} from './dto/create-sender-registration.dto.js';
 
 @Injectable()
 export class SenderRegistrationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
   async create(
-  businessId: string,
-  dto: CreateSenderRegistrationDto,
-) {
+    businessId: string,
+    dto: CreateSenderRegistrationDto,
+  ) {
     const business =
-  await this.prisma.business.findUnique({
-    where: {
-      id: businessId,
-    },
-  });
+      await this.prisma.business.findUnique({
+        where: {
+          id: businessId,
+        },
+
+        select: {
+          id: true,
+        },
+      });
 
     if (!business) {
-      throw new BadRequestException('Business does not exist');
+      throw new BadRequestException(
+        'Business does not exist',
+      );
     }
 
     return this.prisma.senderRegistration.create({
       data: {
         businessId,
-        channel: dto.channel,
-        senderType: dto.senderType,
-        senderValue: dto.senderValue,
-        countryCode: dto.countryCode.toUpperCase(),
-        destinationCountry: dto.destinationCountry?.toUpperCase(),
-        useCase: dto.useCase,
-        estimatedMonthlyVolume: dto.estimatedMonthlyVolume,
-        provider: 'infobip',
-        status: 'DRAFT',
+
+        channel:
+          dto.channel,
+
+        senderType:
+          dto.senderType,
+
+        senderValue:
+          dto.senderValue.trim(),
+
+        countryCode:
+          dto.countryCode
+            .trim()
+            .toUpperCase(),
+
+        destinationCountry:
+          dto.destinationCountry
+            ?.trim()
+            .toUpperCase(),
+
+        useCase:
+          dto.useCase?.trim(),
+
+        estimatedMonthlyVolume:
+          dto.estimatedMonthlyVolume,
+
+        provider:
+          'infobip',
+
+        status:
+          'DRAFT',
       },
-      include: {
-        business: true,
+
+      select: {
+        id: true,
+        channel: true,
+        senderType: true,
+        senderValue: true,
+        countryCode: true,
+        destinationCountry: true,
+        status: true,
+
+        useCase: true,
+
+        estimatedMonthlyVolume:
+          true,
+
+        rejectionReason: true,
+
+        submittedAt: true,
+        approvedAt: true,
+        rejectedAt: true,
+
+        createdAt: true,
+        updatedAt: true,
       },
     });
   }
 
   findByBusiness(
-  businessId: string,
-) {
-  return this.prisma.senderRegistration.findMany({
-    where: {
-      businessId,
-    },
+    businessId: string,
+  ) {
+    return this.prisma.senderRegistration.findMany({
+      where: {
+        businessId,
+      },
 
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
-}
+      orderBy: {
+        createdAt:
+          'desc',
+      },
 
-  async findOne(id: string) {
-    const registration = await this.prisma.senderRegistration.findUnique({
-      where: { id },
-      include: {
-        business: true,
+      select: {
+        id: true,
+        channel: true,
+        senderType: true,
+        senderValue: true,
+
+        countryCode: true,
+        destinationCountry: true,
+
+        status: true,
+
+        useCase: true,
+
+        estimatedMonthlyVolume:
+          true,
+
+        rejectionReason: true,
+
+        submittedAt: true,
+        approvedAt: true,
+        rejectedAt: true,
+
+        createdAt: true,
+        updatedAt: true,
       },
     });
+  }
+
+  async findOneForBusiness(
+    businessId: string,
+    id: string,
+  ) {
+    const registration =
+      await this.prisma.senderRegistration.findFirst({
+        where: {
+          id,
+          businessId,
+        },
+
+        select: {
+          id: true,
+          channel: true,
+          senderType: true,
+          senderValue: true,
+
+          countryCode: true,
+          destinationCountry: true,
+
+          status: true,
+
+          useCase: true,
+
+          estimatedMonthlyVolume:
+            true,
+
+          rejectionReason: true,
+
+          submittedAt: true,
+          approvedAt: true,
+          rejectedAt: true,
+
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
     if (!registration) {
-      throw new NotFoundException('Sender registration not found');
+      throw new NotFoundException(
+        'Sender registration not found',
+      );
+    }
+
+    return registration;
+  }
+
+  async findOne(
+    id: string,
+  ) {
+    const registration =
+      await this.prisma.senderRegistration.findUnique({
+        where: {
+          id,
+        },
+
+        include: {
+          business: true,
+        },
+      });
+
+    if (!registration) {
+      throw new NotFoundException(
+        'Sender registration not found',
+      );
     }
 
     return registration;
@@ -75,6 +212,7 @@ export class SenderRegistrationsService {
 
   async updateStatus(
     id: string,
+
     dto: {
       status:
         | 'DRAFT'
@@ -83,71 +221,138 @@ export class SenderRegistrationsService {
         | 'APPROVED'
         | 'REJECTED'
         | 'SUSPENDED';
+
       providerReference?: string;
       rejectionReason?: string;
     },
   ) {
-    const registration = await this.findOne(id);
-    const status = dto.status;
+    const registration =
+      await this.findOne(
+        id,
+      );
+
+    const status =
+      dto.status;
 
     const allowedTransitions: Record<
       typeof registration.status,
-      Array<typeof registration.status>
+      Array<
+        typeof registration.status
+      >
     > = {
-      DRAFT: ['SUBMITTED'],
-      SUBMITTED: ['PENDING'],
-      PENDING: ['APPROVED', 'REJECTED'],
-      APPROVED: ['SUSPENDED'],
-      REJECTED: ['DRAFT'],
-      SUSPENDED: ['APPROVED'],
+      DRAFT: [
+        'SUBMITTED',
+      ],
+
+      SUBMITTED: [
+        'PENDING',
+      ],
+
+      PENDING: [
+        'APPROVED',
+        'REJECTED',
+      ],
+
+      APPROVED: [
+        'SUSPENDED',
+      ],
+
+      REJECTED: [
+        'DRAFT',
+      ],
+
+      SUSPENDED: [
+        'APPROVED',
+      ],
     };
 
-    const allowed = allowedTransitions[registration.status];
+    const allowed =
+      allowedTransitions[
+        registration.status
+      ];
 
-    if (!allowed.includes(status)) {
+    if (
+      !allowed.includes(
+        status,
+      )
+    ) {
       throw new BadRequestException(
         `Invalid sender status transition: ${registration.status} -> ${status}`,
       );
     }
 
-    if (status === 'REJECTED' && !dto.rejectionReason) {
+    if (
+      status ===
+        'REJECTED' &&
+      !dto.rejectionReason
+        ?.trim()
+    ) {
       throw new BadRequestException(
         'rejectionReason is required when rejecting a sender registration',
       );
     }
 
-    const now = new Date();
+    const now =
+      new Date();
 
     return this.prisma.senderRegistration.update({
-      where: { id },
+      where: {
+        id,
+      },
+
       data: {
         status,
 
-        providerReference: dto.providerReference ?? undefined,
+        providerReference:
+          dto.providerReference
+            ?.trim() ||
+          undefined,
 
         rejectionReason:
-          status === 'REJECTED'
+          status ===
+          'REJECTED'
             ? dto.rejectionReason
-            : status === 'DRAFT'
+                ?.trim()
+            : status ===
+                'DRAFT'
               ? null
               : undefined,
 
         submittedAt:
-          status === 'SUBMITTED' ? now : status === 'DRAFT' ? null : undefined,
+          status ===
+          'SUBMITTED'
+            ? now
+            : status ===
+                'DRAFT'
+              ? null
+              : undefined,
 
         approvedAt:
-          status === 'APPROVED' ? now : status === 'DRAFT' ? null : undefined,
+          status ===
+          'APPROVED'
+            ? now
+            : status ===
+                'DRAFT'
+              ? null
+              : undefined,
 
         rejectedAt:
-          status === 'REJECTED' ? now : status === 'DRAFT' ? null : undefined,
+          status ===
+          'REJECTED'
+            ? now
+            : status ===
+                'DRAFT'
+              ? null
+              : undefined,
       },
+
       include: {
         business: true,
       },
     });
   }
 
-  async findOneForBusiness(
+  async submitForReview(
   businessId: string,
   id: string,
 ) {
@@ -165,8 +370,42 @@ export class SenderRegistrationsService {
     );
   }
 
-  return registration;
+  if (
+    registration.status !==
+    'DRAFT'
+  ) {
+    throw new BadRequestException(
+      `Only DRAFT sender registrations can be submitted. Current status: ${registration.status}`,
+    );
+  }
+
+  return this.prisma.senderRegistration.update({
+    where: {
+      id,
+    },
+
+    data: {
+      status: 'SUBMITTED',
+      submittedAt: new Date(),
+    },
+
+    select: {
+      id: true,
+      channel: true,
+      senderType: true,
+      senderValue: true,
+      countryCode: true,
+      destinationCountry: true,
+      status: true,
+      useCase: true,
+      estimatedMonthlyVolume: true,
+      rejectionReason: true,
+      submittedAt: true,
+      approvedAt: true,
+      rejectedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 }
 }
-
-
