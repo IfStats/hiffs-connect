@@ -3,6 +3,10 @@ import { BadRequestException, Injectable, InternalServerErrorException, Logger, 
 import { PrismaService } from '../prisma.service.js';
 import { SendSmsDto } from './dto/send-sms.dto.js';
 import { SendBatchSmsDto } from './dto/send-batch-sms.dto.js';
+import {
+  SendTemplateBatchSmsDto,
+} from './dto/send-template-batch-sms.dto.js';
+
 import { InfobipDeliveryReportDto } from './dto/infobip-delivery-report.dto.js';
 import { RouteMobileDeliveryReportDto } from './dto/routemobile-delivery-report.dto.js';
 import { InfobipProvider } from './providers/infobip.provider.js';
@@ -791,6 +795,336 @@ export class MessagingService {
 
     smsPagesPerRecipient:
       smsUsage.segmentCount,
+
+    requiredSmsUnits,
+
+    results,
+  };
+}
+
+async sendTemplateBatchSms(
+  dto: SendTemplateBatchSmsDto,
+  authenticatedBusinessId: string,
+) {
+  const contactIds = [
+    ...new Set(
+      dto.contactIds
+        .map((id) =>
+          id.trim(),
+        )
+        .filter(Boolean),
+    ),
+  ];
+
+  if (
+    contactIds.length === 0
+  ) {
+    throw new BadRequestException(
+      'At least one contact is required',
+    );
+  }
+
+  const template =
+    await this.prisma.messageTemplate.findFirst({
+      where: {
+        id:
+          dto.templateId,
+
+        businessId:
+          authenticatedBusinessId,
+
+        status:
+          'ACTIVE',
+
+        channel:
+          'SMS',
+      },
+    });
+
+  if (!template) {
+    throw new BadRequestException(
+      'Active SMS template not found',
+    );
+  }
+
+  const supportedVariables =
+    new Set([
+      'firstName',
+      'lastName',
+      'displayName',
+      'phone',
+      'email',
+    ]);
+
+  const unsupportedVariables =
+    template.variables.filter(
+      (variable) =>
+        !supportedVariables.has(
+          variable,
+        ),
+    );
+
+  if (
+    unsupportedVariables.length >
+    0
+  ) {
+    throw new BadRequestException(
+      `Unsupported template variables: ${unsupportedVariables.join(
+        ', ',
+      )}`,
+    );
+  }
+
+  const contacts =
+    await this.prisma.contact.findMany({
+      where: {
+        businessId:
+          authenticatedBusinessId,
+
+        id: {
+          in:
+            contactIds,
+        },
+
+        status:
+          'ACTIVE',
+      },
+
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        displayName: true,
+        phone: true,
+        email: true,
+      },
+    });
+
+  if (
+    contacts.length !==
+    contactIds.length
+  ) {
+    throw new BadRequestException(
+      'One or more selected contacts are unavailable or inactive',
+    );
+  }
+
+  const contactById =
+    new Map(
+      contacts.map(
+        (contact) => [
+          contact.id,
+          contact,
+        ],
+      ),
+    );
+
+  const renderedRecipients =
+    contactIds.map(
+      (contactId) => {
+        const contact =
+          contactById.get(
+            contactId,
+          );
+
+        if (!contact) {
+          throw new BadRequestException(
+            'Selected contact could not be resolved',
+          );
+        }
+
+        const values: Record<
+          string,
+          string
+        > = {
+          firstName:
+            contact.firstName ??
+            '',
+
+          lastName:
+            contact.lastName ??
+            '',
+
+          displayName:
+            contact.displayName ??
+            [
+              contact.firstName,
+              contact.lastName,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .trim(),
+
+          phone:
+            contact.phone,
+
+          email:
+            contact.email ??
+            '',
+        };
+
+        const text =
+          template.content.replace(
+            /{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}/g,
+            (
+              _match,
+              variable: string,
+            ) =>
+              values[
+                variable
+              ] ?? '',
+          );
+
+        if (!text.trim()) {
+          throw new BadRequestException(
+            `Template rendered an empty message for contact ${contact.id}`,
+          );
+        }
+
+        const usage =
+          calculateSmsUsage(
+            text,
+          );
+
+        return {
+          contactId:
+            contact.id,
+
+          to:
+            contact.phone,
+
+          text,
+
+          segmentCount:
+            usage.segmentCount,
+        };
+      },
+    );
+
+  const requiredSmsUnits =
+    renderedRecipients.reduce(
+      (
+        total,
+        recipient,
+      ) =>
+        total +
+        recipient.segmentCount,
+      0,
+    );
+
+  const wallet =
+    await this.prisma.wallet.findUnique({
+      where: {
+        businessId:
+          authenticatedBusinessId,
+      },
+
+      select: {
+        smsUnits: true,
+      },
+    });
+
+  if (!wallet) {
+    throw new BadRequestException(
+      'Business wallet not found',
+    );
+  }
+
+  if (
+    wallet.smsUnits <
+    requiredSmsUnits
+  ) {
+    throw new BadRequestException(
+      `Insufficient SMS units. This personalized batch requires ${requiredSmsUnits} units but only ${wallet.smsUnits} are available.`,
+    );
+  }
+
+  const results = [];
+
+  for (
+    const recipient
+    of renderedRecipients
+  ) {
+    try {
+      const result =
+        await this.sendSms(
+          {
+            to:
+              recipient.to,
+
+            text:
+              recipient.text,
+
+            senderRegistrationId:
+              dto.senderRegistrationId,
+          },
+
+          authenticatedBusinessId,
+        );
+
+      results.push({
+        contactId:
+          recipient.contactId,
+
+        to:
+          recipient.to,
+
+        success:
+          true,
+
+        id:
+          result.id,
+
+        status:
+          result.status,
+
+        segmentCount:
+          result.segmentCount,
+
+        customerPrice:
+          result.customerPrice,
+
+        currency:
+          result.currency,
+      });
+    } catch (error) {
+      results.push({
+        contactId:
+          recipient.contactId,
+
+        to:
+          recipient.to,
+
+        success:
+          false,
+
+        error:
+          error instanceof
+            Error
+            ? error.message
+            : 'SMS submission failed',
+      });
+    }
+  }
+
+  return {
+    templateId:
+      template.id,
+
+    submitted:
+      renderedRecipients.length,
+
+    successful:
+      results.filter(
+        (result) =>
+          result.success,
+      ).length,
+
+    failed:
+      results.filter(
+        (result) =>
+          !result.success,
+      ).length,
 
     requiredSmsUnits,
 

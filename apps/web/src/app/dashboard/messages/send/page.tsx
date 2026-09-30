@@ -27,6 +27,15 @@ type Wallet = {
   smsUnits: number;
 };
 
+type MessageTemplate = {
+  id: string;
+  name: string;
+  channel: string;
+  content: string;
+  variables: string[];
+  status: string;
+};
+
 export default async function SendMessagePage() {
   const session =
     await getServerSession(
@@ -57,6 +66,7 @@ export default async function SendMessagePage() {
  const [
   sendersResponse,
   walletResponse,
+  templatesResponse,
 ] = await Promise.all([
   fetch(
     `${apiUrl}/sender-registrations/business/${businessId}`,
@@ -65,7 +75,6 @@ export default async function SendMessagePage() {
         Authorization:
           `Bearer ${accessToken}`,
       },
-
       cache: "no-store",
     },
   ),
@@ -77,7 +86,17 @@ export default async function SendMessagePage() {
         Authorization:
           `Bearer ${accessToken}`,
       },
+      cache: "no-store",
+    },
+  ),
 
+  fetch(
+    `${apiUrl}/businesses/${businessId}/templates?status=ACTIVE`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
+      },
       cache: "no-store",
     },
   ),
@@ -85,12 +104,23 @@ export default async function SendMessagePage() {
 
 if (
   !sendersResponse.ok ||
-  !walletResponse.ok
+  !walletResponse.ok  ||
+  !templatesResponse.ok 
 ) {
   throw new Error(
     "Unable to load messaging account",
   );
 }
+
+const templates =
+  (
+    (await templatesResponse.json()) as
+      MessageTemplate[]
+  ).filter(
+    (template) =>
+      template.channel === "SMS" &&
+      template.status === "ACTIVE",
+  );
 
 const registrations =
   (await sendersResponse.json()) as SenderRegistration[];
@@ -157,6 +187,7 @@ const wallet =
               accessToken
             }
             senders={senders}
+            templates={templates}
             smsUnits={wallet.smsUnits}
           />
         </section>

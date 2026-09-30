@@ -6,12 +6,13 @@ import {
   useState,
 } from "react";
 
-type Contact = {
+export type ContactRecipient = {
   id: string;
   firstName?: string | null;
   lastName?: string | null;
   displayName?: string | null;
   phone: string;
+  email?: string | null;
   status?: string;
 };
 
@@ -24,15 +25,18 @@ type Props = {
   apiUrl: string;
   businessId: string;
   accessToken: string;
-  value: string[];
+
+  value: ContactRecipient[];
+
   onChange: (
-    recipients: string[],
+    recipients: ContactRecipient[],
   ) => void;
+
   maxRecipients?: number;
 };
 
 function getContactName(
-  contact: Contact,
+  contact: ContactRecipient,
 ) {
   if (
     contact.displayName?.trim()
@@ -62,9 +66,9 @@ export function ContactsRecipientPicker({
   maxRecipients = 100,
 }: Props) {
   const [
-    contacts,
-    setContacts,
-  ] = useState<Contact[]>([]);
+  contacts,
+  setContacts,
+] = useState<ContactRecipient[]>([]);
 
   const [
     groups,
@@ -96,10 +100,16 @@ export function ContactsRecipientPicker({
   >(null);
 
   const selected =
-    useMemo(
-      () => new Set(value),
-      [value],
-    );
+  useMemo(
+    () =>
+      new Set(
+        value.map(
+          (contact) =>
+            contact.id,
+        ),
+      ),
+    [value],
+  );
 
   /*
    * Load contact groups.
@@ -277,77 +287,88 @@ export function ContactsRecipientPicker({
   ]);
 
   function toggleContact(
-    phone: string,
+  contact: ContactRecipient,
+) {
+  if (
+    selected.has(
+      contact.id,
+    )
   ) {
-    const normalizedPhone =
-      phone.trim();
+    onChange(
+      value.filter(
+        (item) =>
+          item.id !==
+          contact.id,
+      ),
+    );
 
-    if (
-      selected.has(
-        normalizedPhone,
-      )
-    ) {
-      onChange(
-        value.filter(
-          (item) =>
-            item !==
-            normalizedPhone,
-        ),
-      );
-
-      return;
-    }
-
-    if (
-      value.length >=
-      maxRecipients
-    ) {
-      setError(
-        `A maximum of ${maxRecipients} recipients can be selected for this batch.`,
-      );
-
-      return;
-    }
-
-    setError(null);
-
-    onChange([
-      ...value,
-      normalizedPhone,
-    ]);
+    return;
   }
+
+  if (
+    value.length >=
+    maxRecipients
+  ) {
+    setError(
+      `A maximum of ${maxRecipients} recipients can be selected for this batch.`,
+    );
+
+    return;
+  }
+
+  setError(null);
+
+  onChange([
+    ...value,
+    contact,
+  ]);
+}
 
   function selectDisplayed() {
-    const displayedPhones =
-      contacts
-        .map(
-          (contact) =>
-            contact.phone.trim(),
-        )
-        .filter(Boolean);
+  const merged =
+    new Map<
+      string,
+      ContactRecipient
+    >();
 
-    const merged = [
-      ...new Set([
-        ...value,
-        ...displayedPhones,
-      ]),
-    ];
-
-    if (
-      merged.length >
-      maxRecipients
-    ) {
-      setError(
-        `Selecting these contacts would exceed the ${maxRecipients}-recipient batch limit.`,
-      );
-
-      return;
-    }
-
-    setError(null);
-
-    onChange(merged);
+  for (
+    const contact
+    of value
+  ) {
+    merged.set(
+      contact.id,
+      contact,
+    );
   }
+
+  for (
+    const contact
+    of contacts
+  ) {
+    merged.set(
+      contact.id,
+      contact,
+    );
+  }
+
+  const next =
+    [...merged.values()];
+
+  if (
+    next.length >
+    maxRecipients
+  ) {
+    setError(
+      `Selecting these contacts would exceed the ${maxRecipients}-recipient batch limit.`,
+    );
+
+    return;
+  }
+
+  setError(null);
+
+  onChange(next);
+}
 
   function clearSelection() {
     setError(null);
@@ -355,13 +376,13 @@ export function ContactsRecipientPicker({
   }
 
   const allDisplayedSelected =
-    contacts.length > 0 &&
-    contacts.every(
-      (contact) =>
-        selected.has(
-          contact.phone.trim(),
-        ),
-    );
+  contacts.length > 0 &&
+  contacts.every(
+    (contact) =>
+      selected.has(
+        contact.id,
+      ),
+  );
 
   return (
     <div className="space-y-4">
@@ -510,9 +531,9 @@ export function ContactsRecipientPicker({
                 contact.phone.trim();
 
               const checked =
-                selected.has(
-                  phone,
-                );
+  selected.has(
+    contact.id,
+  );
 
               return (
                 <label
@@ -528,7 +549,7 @@ export function ContactsRecipientPicker({
                     }
                     onChange={() =>
                       toggleContact(
-                        phone,
+                        contact,
                       )
                     }
                     className="h-4 w-4"

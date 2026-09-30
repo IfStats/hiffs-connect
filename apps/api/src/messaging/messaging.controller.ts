@@ -12,6 +12,10 @@ import {
 
 import { ApiKeyGuard, type ApiKeyRequest } from '../api-keys/api-key.guard.js';
 
+import {
+  SendTemplateBatchSmsDto,
+} from './dto/send-template-batch-sms.dto.js';
+
 import type { Response } from 'express';
 import { MessagingService } from './messaging.service.js';
 import { SendSmsDto } from './dto/send-sms.dto.js';
@@ -24,6 +28,7 @@ import { Permission } from '../authz/permission.enum.js';
 import { RequirePermissions } from '../authz/require-permissions.decorator.js';
 import { InfobipWebhookGuard } from './infobip-webhook.guard.js';
 import { RouteMobileWebhookGuard } from './routemobile-webhook.guard.js';
+
 
 @Controller('messaging')
 export class MessagingController {
@@ -75,6 +80,29 @@ sendBusinessBatchSms(
   dto: SendBatchSmsDto,
 ) {
   return this.messagingService.sendBatchSms(
+    dto,
+    businessId,
+  );
+}
+
+@Post(
+  'business/:businessId/sms/template-batch',
+)
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(
+  Permission.MESSAGE_SEND,
+)
+sendBusinessTemplateBatchSms(
+  @Param('businessId')
+  businessId: string,
+
+  @Body()
+  dto: SendTemplateBatchSmsDto,
+) {
+  return this.messagingService.sendTemplateBatchSms(
     dto,
     businessId,
   );
