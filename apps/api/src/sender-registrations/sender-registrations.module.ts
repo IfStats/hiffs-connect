@@ -6,6 +6,7 @@ import { PrismaModule } from '../prisma.module.js';
 
 import { SenderRegistrationsController } from './sender-registrations.controller.js';
 import { SenderRegistrationsService } from './sender-registrations.service.js';
+import { SenderRequirementsService } from './sender-requirements.service.js';
 
 @Module({
   imports: [
@@ -20,10 +21,12 @@ import { SenderRegistrationsService } from './sender-registrations.service.js';
 
   providers: [
     SenderRegistrationsService,
+    SenderRequirementsService,
   ],
 
   exports: [
     SenderRegistrationsService,
+    SenderRequirementsService,
   ],
 })
 export class SenderRegistrationsModule {}

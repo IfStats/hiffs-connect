@@ -17,6 +17,14 @@ import {
   SenderReviewControls,
 } from "./sender-review-controls";
 
+import {
+  SenderValidationControls,
+} from "./sender-validation-controls";
+
+import {
+  SenderDocumentUpload,
+} from "./sender-document-upload";
+
 type SenderStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -89,6 +97,57 @@ type SenderRegistration = {
       | string
       | null;
   };
+
+  requirements: Array<{
+  id: string;
+  provider: string;
+  countryCode: string;
+  channel: string;
+  senderType: string;
+  key: string;
+  name: string;
+  description: string | null;
+  required: boolean;
+  fieldKey: string | null;
+  documentType: string | null;
+  validationRule: unknown;
+}>;
+
+validations: Array<{
+  id: string;
+  provider: string;
+  countryCode: string;
+  status:
+    | "PENDING"
+    | "INTERNAL_REVIEW"
+    | "DOCUMENTS_REQUIRED"
+    | "READY_FOR_PROVIDER"
+    | "PROVIDER_SUBMITTED"
+    | "PROVIDER_PENDING"
+    | "APPROVED"
+    | "REJECTED"
+    | "SUSPENDED";
+  reviewNotes: string | null;
+  providerReference: string | null;
+  submittedToProviderAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}>;
+
+documents: Array<{
+  id: string;
+  documentType: string;
+  fileName: string;
+  fileUrl: string;
+  status:
+    | "PENDING"
+    | "ACCEPTED"
+    | "REJECTED";
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}>;
 };
 
 function formatDate(
@@ -224,6 +283,10 @@ export default async function AdminSenderPage({
 
   const sender =
     (await response.json()) as SenderRegistration;
+
+  const latestValidation =
+  sender.validations[0] ??
+  null;  
 
   return (
     <div className="space-y-8">
@@ -491,6 +554,183 @@ export default async function AdminSenderPage({
           </dl>
         </article>
       </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+  <article className="rounded-2xl border border-slate-200 bg-white p-6">
+    <h2 className="text-lg font-semibold text-slate-950">
+      Provider requirements
+    </h2>
+
+    <p className="mt-1 text-sm text-slate-500">
+      Requirements currently configured for this sender route.
+    </p>
+
+    {sender.requirements.length === 0 ? (
+      <p className="mt-6 text-sm text-slate-500">
+        No active requirements found.
+      </p>
+    ) : (
+      <div className="mt-6 space-y-3">
+        {sender.requirements.map(
+          (requirement) => (
+            <div
+              key={requirement.id}
+              className="rounded-xl border border-slate-200 p-4"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {requirement.name}
+                  </p>
+
+                  {requirement.description && (
+                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                      {requirement.description}
+                    </p>
+                  )}
+                </div>
+
+                <span
+                  className={
+                    requirement.required
+                      ? "rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"
+                      : "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"
+                  }
+                >
+                  {requirement.required
+                    ? "Required"
+                    : "Optional"}
+                </span>
+              </div>
+
+              {requirement.documentType && (
+                <p className="mt-3 text-xs font-medium text-slate-600">
+                  Document: {requirement.documentType}
+                </p>
+              )}
+            </div>
+          ),
+        )}
+      </div>
+    )}
+      <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
+  <SenderDocumentUpload
+    senderId={
+      sender.id
+    }
+  />
+</div>
+  </article>
+
+  <article className="rounded-2xl border border-slate-200 bg-white p-6">
+    <h2 className="text-lg font-semibold text-slate-950">
+      Validation status
+    </h2>
+
+    <p className="mt-1 text-sm text-slate-500">
+      Internal and provider validation history.
+    </p>
+
+    {sender.validations.length === 0 ? (
+  <p className="mt-6 text-sm text-slate-500">
+    No validation records yet.
+  </p>
+) : (
+  <div className="mt-6 space-y-4">
+    {sender.validations.map(
+      (validation) => (
+        <div
+          key={validation.id}
+          className="rounded-xl border border-slate-200 p-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-slate-900">
+              {validation.provider}
+            </p>
+
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              {validation.status}
+            </span>
+          </div>
+
+          {validation.providerReference && (
+            <p className="mt-3 text-xs text-slate-500">
+              Provider reference:{" "}
+              <span className="font-mono">
+                {validation.providerReference}
+              </span>
+            </p>
+          )}
+
+          {validation.reviewNotes && (
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {validation.reviewNotes}
+            </p>
+          )}
+        </div>
+      ),
+    )}
+
+    {latestValidation && (
+      <div className="border-t border-slate-100 pt-5">
+        <SenderValidationControls
+          senderId={
+            sender.id
+          }
+          currentStatus={
+            latestValidation.status
+          }
+          currentProviderReference={
+            latestValidation.providerReference
+          }
+        />
+      </div>
+    )}
+  </div>
+)}
+  </article>
+</section>
+
+<section className="rounded-2xl border border-slate-200 bg-white p-6">
+  <h2 className="text-lg font-semibold text-slate-950">
+    Documents
+  </h2>
+
+  <p className="mt-1 text-sm text-slate-500">
+    Documents supplied for sender registration and compliance review.
+  </p>
+
+  {sender.documents.length === 0 ? (
+    <p className="mt-6 text-sm text-slate-500">
+      No documents uploaded yet.
+    </p>
+  ) : (
+    <div className="mt-6 divide-y divide-slate-100">
+      {sender.documents.map(
+        (document) => (
+          <div
+            key={document.id}
+            className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center"
+          >
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                {document.fileName}
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                {document.documentType}
+              </p>
+            </div>
+
+            <span className="text-xs font-semibold text-slate-600">
+              {document.status}
+            </span>
+          </div>
+        ),
+      )}
+    </div>
+  )}
+</section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div>

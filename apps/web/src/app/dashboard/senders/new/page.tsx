@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   FormEvent,
+  useEffect,
   useState,
 } from "react";
 
@@ -13,6 +14,23 @@ import {
 import {
   useSession,
 } from "next-auth/react";
+
+type SenderRequirement = {
+  id: string;
+  provider: string;
+  countryCode: string;
+  channel: "SMS" | "WHATSAPP";
+  senderType:
+    | "SHARED"
+    | "DEDICATED";
+  key: string;
+  name: string;
+  description: string | null;
+  required: boolean;
+  fieldKey: string | null;
+  documentType: string | null;
+  validationRule: unknown;
+};
 
 export default function NewSenderPage() {
   const router =
@@ -35,11 +53,117 @@ export default function NewSenderPage() {
       null,
     );
 
+  const [
+    countryCode,
+    setCountryCode,
+  ] = useState("GH");
+
+  const [
+    senderType,
+    setSenderType,
+  ] =
+    useState<
+      "SHARED" | "DEDICATED"
+    >("DEDICATED");
+
+  const [
+    requirements,
+    setRequirements,
+  ] =
+    useState<
+      SenderRequirement[]
+    >([]);
+
+  const [
+    requirementsLoading,
+    setRequirementsLoading,
+  ] = useState(false);
+
   const businessId =
     session?.user?.businessId;
 
   const accessToken =
     session?.user?.accessToken;
+
+  useEffect(() => {
+    if (
+      !accessToken ||
+      countryCode.length !== 2
+    ) {
+      return;
+    }
+
+    const apiUrl =
+      process.env
+        .NEXT_PUBLIC_HIFFS_API_URL;
+
+    if (!apiUrl) {
+      return;
+    }
+
+    const controller =
+      new AbortController();
+
+    async function loadRequirements() {
+      setRequirementsLoading(
+        true,
+      );
+
+      try {
+        const response =
+          await fetch(
+            `${apiUrl}/sender-registrations/requirements?provider=infobip&countryCode=${countryCode}&channel=SMS&senderType=${senderType}`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${accessToken}`,
+              },
+
+              signal:
+                controller.signal,
+            },
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            "Unable to load sender requirements.",
+          );
+        }
+
+        const data =
+          (await response.json()) as SenderRequirement[];
+
+        setRequirements(data);
+      } catch (
+        caughtError
+      ) {
+        if (
+          caughtError instanceof
+            DOMException &&
+          caughtError.name ===
+            "AbortError"
+        ) {
+          return;
+        }
+
+        setRequirements([]);
+      } finally {
+        setRequirementsLoading(
+          false,
+        );
+      }
+    }
+
+    void loadRequirements();
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    accessToken,
+    countryCode,
+    senderType,
+  ]);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -69,7 +193,7 @@ export default function NewSenderPage() {
         ) ?? "",
       ).trim();
 
-    const countryCode =
+    const normalizedCountryCode =
       String(
         form.get(
           "countryCode",
@@ -109,7 +233,7 @@ export default function NewSenderPage() {
     }
 
     if (
-      countryCode.length !==
+      normalizedCountryCode.length !==
       2
     ) {
       setError(
@@ -135,7 +259,8 @@ export default function NewSenderPage() {
 
       senderValue,
 
-      countryCode,
+      countryCode:
+        normalizedCountryCode,
 
       destinationCountry:
         destinationCountry ||
@@ -268,7 +393,9 @@ export default function NewSenderPage() {
       );
 
       router.refresh();
-    } catch (caughtError) {
+    } catch (
+      caughtError
+    ) {
       setError(
         caughtError instanceof
           Error
@@ -347,7 +474,19 @@ export default function NewSenderPage() {
             <select
               id="senderType"
               name="senderType"
-              defaultValue="DEDICATED"
+              value={
+                senderType
+              }
+              onChange={(
+                event,
+              ) =>
+                setSenderType(
+                  event.target
+                    .value as
+                    | "SHARED"
+                    | "DEDICATED",
+                )
+              }
               className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-slate-400"
             >
               <option value="DEDICATED">
@@ -402,6 +541,21 @@ export default function NewSenderPage() {
               type="text"
               required
               maxLength={2}
+              value={
+                countryCode
+              }
+              onChange={(
+                event,
+              ) =>
+                setCountryCode(
+                  event.target.value
+                    .toUpperCase()
+                    .slice(
+                      0,
+                      2,
+                    ),
+                )
+              }
               placeholder="GH"
               className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm uppercase outline-none focus:border-slate-400"
             />
@@ -461,6 +615,92 @@ export default function NewSenderPage() {
             placeholder="10000"
             className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-slate-400"
           />
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                Registration
+                requirements
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Infobip requirements
+                for{" "}
+                {countryCode ||
+                  "the selected country"}.
+              </p>
+            </div>
+
+            {requirementsLoading && (
+              <span className="text-xs font-medium text-slate-500">
+                Loading...
+              </span>
+            )}
+          </div>
+
+          {!requirementsLoading &&
+            requirements.length ===
+              0 && (
+              <p className="mt-4 text-sm text-slate-500">
+                No active
+                requirements were
+                found for this
+                country and sender
+                type.
+              </p>
+            )}
+
+          {!requirementsLoading &&
+            requirements.length >
+              0 && (
+              <div className="mt-4 space-y-3">
+                {requirements.map(
+                  (
+                    requirement,
+                  ) => (
+                    <div
+                      key={
+                        requirement.id
+                      }
+                      className="rounded-xl border border-slate-200 bg-white p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-900">
+                          {
+                            requirement.name
+                          }
+                        </p>
+
+                        {requirement.required && (
+                          <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                            Required
+                          </span>
+                        )}
+                      </div>
+
+                      {requirement.description && (
+                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                          {
+                            requirement.description
+                          }
+                        </p>
+                      )}
+
+                      {requirement.documentType && (
+                        <p className="mt-2 text-xs font-medium text-slate-600">
+                          Document:{" "}
+                          {
+                            requirement.documentType
+                          }
+                        </p>
+                      )}
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
         </div>
 
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">

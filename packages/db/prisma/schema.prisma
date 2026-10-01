@@ -106,6 +106,24 @@ enum TemplateStatus {
   ARCHIVED
 }
 
+enum SenderValidationStatus {
+  PENDING
+  INTERNAL_REVIEW
+  DOCUMENTS_REQUIRED
+  READY_FOR_PROVIDER
+  PROVIDER_SUBMITTED
+  PROVIDER_PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum SenderDocumentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 model Business {
   id              String @id @default(cuid())
   name            String
@@ -140,6 +158,9 @@ model SenderRegistration {
   businessId String
   business   Business @relation(fields: [businessId], references: [id])
 
+  validations SenderValidation[]
+  documents   SenderDocument[]
+
   channel     MessageChannel
   senderType  SenderType
   senderValue String
@@ -169,6 +190,93 @@ model SenderRegistration {
   @@index([countryCode])
   @@index([status])
   @@index([providerReference])
+}
+
+model SenderRequirement {
+  id String @id @default(cuid())
+
+  provider    String
+  countryCode String
+
+  channel    MessageChannel @default(SMS)
+  senderType SenderType
+
+  key         String
+  name        String
+  description String?
+
+  required Boolean @default(true)
+
+  fieldKey     String?
+  documentType String?
+
+  validationRule Json?
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, countryCode, channel, senderType, key])
+  @@index([provider])
+  @@index([countryCode])
+  @@index([channel])
+  @@index([senderType])
+  @@index([active])
+}
+
+model SenderValidation {
+  id String @id @default(cuid())
+
+  senderRegistrationId String
+  senderRegistration   SenderRegistration @relation(fields: [senderRegistrationId], references: [id], onDelete: Cascade)
+
+  provider    String
+  countryCode String
+
+  status SenderValidationStatus @default(PENDING)
+
+  reviewerUserId String?
+  reviewerUser   User?   @relation("SenderValidationReviewer", fields: [reviewerUserId], references: [id])
+
+  reviewNotes String?
+
+  providerReference String?
+
+  submittedToProviderAt DateTime?
+  completedAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([senderRegistrationId])
+  @@index([provider])
+  @@index([countryCode])
+  @@index([status])
+  @@index([reviewerUserId])
+}
+
+model SenderDocument {
+  id String @id @default(cuid())
+
+  senderRegistrationId String
+  senderRegistration   SenderRegistration @relation(fields: [senderRegistrationId], references: [id], onDelete: Cascade)
+
+  documentType String
+
+  fileName String
+  fileUrl  String
+
+  status SenderDocumentStatus @default(PENDING)
+
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([senderRegistrationId])
+  @@index([documentType])
+  @@index([status])
 }
 
 model CountryPricing {
@@ -528,6 +636,7 @@ model User {
   status                      AccountStatus            @default(ACTIVE)
   invitationsSent             BusinessInvitation[]     @relation("BusinessInvitationInvitedBy")
   invitationsAccepted         BusinessInvitation[]     @relation("BusinessInvitationAcceptedBy")
+  senderValidationsReviewed   SenderValidation[]       @relation("SenderValidationReviewer")
   emailVerificationTokens     EmailVerificationToken[]
   phoneVerifications          PhoneVerification[]
   refreshSessions             AuthRefreshSession[]
