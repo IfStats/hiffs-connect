@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -12,6 +13,10 @@ import {
 import {
   CreateSenderRegistrationPricingDto,
 } from './dto/create-sender-registration-pricing.dto.js';
+
+import {
+  ReplaceSenderRegistrationPricingDto,
+} from './dto/replace-sender-registration-pricing.dto.js';
 
 @Injectable()
 export class PricingService {
@@ -88,20 +93,79 @@ export class PricingService {
     return pricing;
   }
 
-  createSenderRegistrationPricing(
+  async createSenderRegistrationPricing(
   dto: CreateSenderRegistrationPricingDto,
 ) {
+  const provider =
+    dto.provider
+      .trim()
+      .toLowerCase();
+
+  const countryCode =
+    dto.countryCode
+      .trim()
+      .toUpperCase();
+
+  const providerCostCurrency =
+    dto.providerCostCurrency
+      .trim()
+      .toUpperCase();
+
+  const currency =
+    dto.currency
+      .trim()
+      .toUpperCase();
+
+  const now =
+    new Date();
+
+  const existing =
+    await this.prisma.senderRegistrationPricing.findFirst({
+      where: {
+        provider,
+        countryCode,
+
+        channel:
+          dto.channel,
+
+        senderType:
+          dto.senderType,
+
+        currency,
+
+        active:
+          true,
+
+        effectiveFrom: {
+          lte:
+            now,
+        },
+
+        OR: [
+          {
+            effectiveTo:
+              null,
+          },
+          {
+            effectiveTo: {
+              gt:
+                now,
+            },
+          },
+        ],
+      },
+    });
+
+  if (existing) {
+    throw new BadRequestException(
+      `Active sender registration pricing already exists for ${provider}/${countryCode}/${dto.channel}/${dto.senderType} in ${currency}. Deactivate the existing pricing before creating a replacement.`,
+    );
+  }
+
   return this.prisma.senderRegistrationPricing.create({
     data: {
-      provider:
-        dto.provider
-          .trim()
-          .toLowerCase(),
-
-      countryCode:
-        dto.countryCode
-          .trim()
-          .toUpperCase(),
+      provider,
+      countryCode,
 
       channel:
         dto.channel,
@@ -112,21 +176,18 @@ export class PricingService {
       providerCost:
         dto.providerCost,
 
-      providerCostCurrency:
-        dto.providerCostCurrency
-          .trim()
-          .toUpperCase(),
+      providerCostCurrency,
 
       retailPrice:
         dto.retailPrice,
 
-      currency:
-        dto.currency
-          .trim()
-          .toUpperCase(),
+      currency,
 
       active:
         true,
+
+      effectiveFrom:
+        now,
     },
   });
 }
@@ -156,5 +217,132 @@ findSenderRegistrationPricing() {
       },
     ],
   });
+}
+
+async deactivateSenderRegistrationPricing(
+  id: string,
+) {
+  const pricing =
+    await this.prisma.senderRegistrationPricing.findUnique({
+      where: {
+        id,
+      },
+    });
+
+  if (!pricing) {
+    throw new NotFoundException(
+      'Sender registration pricing not found',
+    );
+  }
+
+  if (!pricing.active) {
+    return pricing;
+  }
+
+  const now =
+    new Date();
+
+  return this.prisma.senderRegistrationPricing.update({
+    where: {
+      id,
+    },
+
+    data: {
+      active:
+        false,
+
+      effectiveTo:
+        pricing.effectiveTo ??
+        now,
+    },
+  });
+}
+
+async replaceSenderRegistrationPricing(
+  id: string,
+  dto: ReplaceSenderRegistrationPricingDto,
+) {
+  const existing =
+    await this.prisma.senderRegistrationPricing.findUnique({
+      where: {
+        id,
+      },
+    });
+
+  if (!existing) {
+    throw new NotFoundException(
+      'Sender registration pricing not found',
+    );
+  }
+
+  if (!existing.active) {
+    throw new BadRequestException(
+      'Only active sender registration pricing can be replaced',
+    );
+  }
+
+  const currency =
+    dto.currency
+      .trim()
+      .toUpperCase();
+
+  const providerCostCurrency =
+    dto.providerCostCurrency
+      .trim()
+      .toUpperCase();
+
+  const now =
+    new Date();
+
+  return this.prisma.$transaction(
+    async (tx) => {
+      await tx.senderRegistrationPricing.update({
+        where: {
+          id:
+            existing.id,
+        },
+
+        data: {
+          active:
+            false,
+
+          effectiveTo:
+            now,
+        },
+      });
+
+      return tx.senderRegistrationPricing.create({
+        data: {
+          provider:
+            existing.provider,
+
+          countryCode:
+            existing.countryCode,
+
+          channel:
+            existing.channel,
+
+          senderType:
+            existing.senderType,
+
+          providerCost:
+            dto.providerCost,
+
+          providerCostCurrency,
+
+          retailPrice:
+            dto.retailPrice,
+
+          currency,
+
+          active:
+            true,
+
+          effectiveFrom:
+            now,
+        },
+      });
+    },
+  );
 }
 }

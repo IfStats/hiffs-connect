@@ -14,6 +14,14 @@ import {
   SenderPricingForm,
 } from "./sender-pricing-form";
 
+import {
+  DeactivatePricingButton,
+} from "./deactivate-pricing-button";
+
+import {
+  ReplacePricingForm,
+} from "./replace-pricing-form";
+
 type MessagingPricing = {
   id: string;
   countryCode: string;
@@ -208,6 +216,10 @@ export default async function AdminPricingPage() {
                   <th className="px-6 py-4">
                     Effective
                   </th>
+
+                  <th className="px-6 py-4">
+  Action
+</th>
                 </tr>
               </thead>
 
@@ -277,6 +289,40 @@ export default async function AdminPricingPage() {
                           "en-GB",
                         )}
                       </td>
+
+                      <td className="px-6 py-4">
+  {pricing.active ? (
+    <div className="flex items-start gap-3">
+      <ReplacePricingForm
+        pricingId={
+          pricing.id
+        }
+        providerCost={
+          pricing.providerCost
+        }
+        providerCostCurrency={
+          pricing.providerCostCurrency
+        }
+        retailPrice={
+          pricing.retailPrice
+        }
+        currency={
+          pricing.currency
+        }
+      />
+
+      <DeactivatePricingButton
+        pricingId={
+          pricing.id
+        }
+      />
+    </div>
+  ) : (
+    <span className="text-xs text-slate-400">
+      —
+    </span>
+  )}
+</td>
                     </tr>
                   ),
                 )}

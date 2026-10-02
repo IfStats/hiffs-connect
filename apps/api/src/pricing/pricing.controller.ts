@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -17,6 +18,9 @@ import {
   CreateSenderRegistrationPricingDto,
 } from './dto/create-sender-registration-pricing.dto.js';
 import { PricingService } from './pricing.service.js';
+import {
+  ReplaceSenderRegistrationPricingDto,
+} from './dto/replace-sender-registration-pricing.dto.js';
 
 @Controller('pricing')
 @UseGuards(
@@ -66,6 +70,40 @@ createSenderRegistrationPricing(
 )
 findSenderRegistrationPricing() {
   return this.pricingService.findSenderRegistrationPricing();
+}
+
+@Patch(
+  'sender-registrations/:id/deactivate',
+)
+@RequirePermissions(
+  Permission.PRICING_MANAGE,
+)
+deactivateSenderRegistrationPricing(
+  @Param('id')
+  id: string,
+) {
+  return this.pricingService.deactivateSenderRegistrationPricing(
+    id,
+  );
+}
+
+@Patch(
+  'sender-registrations/:id/replace',
+)
+@RequirePermissions(
+  Permission.PRICING_MANAGE,
+)
+replaceSenderRegistrationPricing(
+  @Param('id')
+  id: string,
+
+  @Body()
+  dto: ReplaceSenderRegistrationPricingDto,
+) {
+  return this.pricingService.replaceSenderRegistrationPricing(
+    id,
+    dto,
+  );
 }
 
   @Get(':id')

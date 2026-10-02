@@ -18,6 +18,9 @@ import { JobsModule } from './jobs/jobs.module.js';
 import {
   TemplatesModule,
 } from './templates/templates.module.js';
+import {
+  CampaignsModule,
+} from './campaigns/campaigns.module.js';
 
 @Module({
   imports: [
@@ -37,6 +40,7 @@ import {
     AdminModule,
     ContactsModule,
     TemplatesModule,
+    CampaignsModule,
     JobsModule,
   ],
   controllers: [AppController],

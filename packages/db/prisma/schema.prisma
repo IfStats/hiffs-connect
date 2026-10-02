@@ -147,6 +147,27 @@ enum WalletTransactionType {
   ADJUSTMENT
 }
 
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  QUEUED
+  PROCESSING
+  COMPLETED
+  PARTIALLY_FAILED
+  FAILED
+  CANCELLED
+}
+
+enum CampaignRecipientStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  SENT
+  DELIVERED
+  FAILED
+  SKIPPED
+}
+
 model Business {
   id              String @id @default(cuid())
   name            String
@@ -168,6 +189,7 @@ model Business {
   contacts         Contact[]
   contactGroups    ContactGroup[]
   templates        MessageTemplate[]
+  campaigns        Campaign[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -210,7 +232,8 @@ model SenderRegistration {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages Message[]
+  messages  Message[]
+  campaigns Campaign[]
 
   @@index([businessId])
   @@index([countryCode])
@@ -377,6 +400,7 @@ model Message {
 
   senderRegistrationId String?
   senderRegistration   SenderRegistration? @relation(fields: [senderRegistrationId], references: [id])
+  campaignRecipient    CampaignRecipient?
 
   channel           MessageChannel
   provider          String
@@ -954,4 +978,80 @@ model SenderRegistrationPricing {
   @@index([channel])
   @@index([senderType])
   @@index([active])
+}
+
+model Campaign {
+  id String @id @default(cuid())
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  senderRegistrationId String
+  senderRegistration   SenderRegistration @relation(fields: [senderRegistrationId], references: [id])
+
+  name String
+
+  channel MessageChannel @default(SMS)
+
+  content String
+
+  status CampaignStatus @default(DRAFT)
+
+  totalRecipients Int @default(0)
+
+  queuedCount     Int @default(0)
+  processingCount Int @default(0)
+  sentCount       Int @default(0)
+  deliveredCount  Int @default(0)
+  failedCount     Int @default(0)
+  skippedCount    Int @default(0)
+
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  recipients CampaignRecipient[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([senderRegistrationId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([createdAt])
+}
+
+model CampaignRecipient {
+  id String @id @default(cuid())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  recipient String
+
+  status CampaignRecipientStatus @default(PENDING)
+
+  messageId String?  @unique
+  message   Message? @relation(fields: [messageId], references: [id])
+
+  attemptCount Int @default(0)
+
+  queuedAt     DateTime?
+  processingAt DateTime?
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  failedAt     DateTime?
+
+  failureReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campaignId, recipient])
+  @@index([campaignId])
+  @@index([status])
+  @@index([recipient])
+  @@index([createdAt])
 }
