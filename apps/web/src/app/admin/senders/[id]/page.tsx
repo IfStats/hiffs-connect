@@ -25,6 +25,14 @@ import {
   SenderDocumentUpload,
 } from "./sender-document-upload";
 
+import {
+  SenderDocumentReviewControls,
+} from "./sender-document-review-controls";
+
+import {
+  SenderDocumentReadiness,
+} from "@/components/senders/sender-document-readiness";
+
 type SenderStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -148,6 +156,46 @@ documents: Array<{
   createdAt: string;
   updatedAt: string;
 }>;
+
+auditEvents: Array<{
+  id: string;
+
+  action:
+    | "REGISTRATION_CREATED"
+    | "REGISTRATION_SUBMITTED"
+    | "VALIDATION_STARTED"
+    | "DOCUMENTS_REQUESTED"
+    | "REVIEW_RESUMED"
+    | "DOCUMENT_UPLOADED"
+    | "DOCUMENT_ACCEPTED"
+    | "DOCUMENT_REJECTED"
+    | "READY_FOR_PROVIDER"
+    | "PROVIDER_SUBMITTED"
+    | "PROVIDER_PENDING"
+    | "APPROVED"
+    | "REJECTED"
+    | "SUSPENDED"
+    | "RESTORED";
+
+  fromStatus: string | null;
+  toStatus: string | null;
+
+  documentId: string | null;
+  documentType: string | null;
+
+  provider: string | null;
+  providerReference: string | null;
+
+  note: string | null;
+
+  createdAt: string;
+
+  actorUser: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+}>;  
 };
 
 function formatDate(
@@ -286,7 +334,45 @@ export default async function AdminSenderPage({
 
   const latestValidation =
   sender.validations[0] ??
-  null;  
+  null;
+  
+  const requiredDocumentTypes =
+  new Set(
+    sender.requirements
+      .filter(
+        (requirement) =>
+          requirement.required &&
+          requirement.documentType,
+      )
+      .map(
+        (requirement) =>
+          requirement.documentType!,
+      ),
+  );
+
+const acceptedDocumentTypes =
+  new Set(
+    sender.documents
+      .filter(
+        (document) =>
+          document.status ===
+          "ACCEPTED",
+      )
+      .map(
+        (document) =>
+          document.documentType,
+      ),
+  );
+
+const documentsReady =
+  Array.from(
+    requiredDocumentTypes,
+  ).every(
+    (documentType) =>
+      acceptedDocumentTypes.has(
+        documentType,
+      ),
+  );
 
   return (
     <div className="space-y-8">
@@ -674,16 +760,19 @@ export default async function AdminSenderPage({
     {latestValidation && (
       <div className="border-t border-slate-100 pt-5">
         <SenderValidationControls
-          senderId={
-            sender.id
-          }
-          currentStatus={
-            latestValidation.status
-          }
-          currentProviderReference={
-            latestValidation.providerReference
-          }
-        />
+  senderId={
+    sender.id
+  }
+  currentStatus={
+    latestValidation.status
+  }
+  currentProviderReference={
+    latestValidation.providerReference
+  }
+  documentsReady={
+    documentsReady
+  }
+/>
       </div>
     )}
   </div>
@@ -700,6 +789,17 @@ export default async function AdminSenderPage({
     Documents supplied for sender registration and compliance review.
   </p>
 
+  <div className="mt-6">
+  <SenderDocumentReadiness
+    requirements={
+      sender.requirements
+    }
+    documents={
+      sender.documents
+    }
+  />
+</div>
+
   {sender.documents.length === 0 ? (
     <p className="mt-6 text-sm text-slate-500">
       No documents uploaded yet.
@@ -707,24 +807,144 @@ export default async function AdminSenderPage({
   ) : (
     <div className="mt-6 divide-y divide-slate-100">
       {sender.documents.map(
-        (document) => (
-          <div
-            key={document.id}
-            className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center"
-          >
-            <div>
-              <p className="text-sm font-semibold text-slate-900">
-                {document.fileName}
-              </p>
+  (document) => (
+    <div
+      key={document.id}
+      className="grid gap-4 py-5 lg:grid-cols-[1fr_auto] lg:items-start"
+    >
+      <div>
+        <p className="text-sm font-semibold text-slate-900">
+          {document.fileName}
+        </p>
 
-              <p className="mt-1 text-xs text-slate-500">
-                {document.documentType}
+        <p className="mt-1 text-xs text-slate-500">
+          {document.documentType}
+        </p>
+
+        <Link
+  href={`/api/admin/senders/${encodeURIComponent(
+    sender.id,
+  )}/documents/${encodeURIComponent(
+    document.id,
+  )}/view`}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="mt-2 inline-flex text-xs font-semibold text-blue-600 hover:text-blue-700"
+>
+  View document
+</Link>
+
+        <p className="mt-2 text-xs font-semibold text-slate-600">
+          Status: {document.status}
+        </p>
+
+        {document.rejectionReason && (
+          <p className="mt-2 rounded-lg border border-red-100 bg-red-50 p-3 text-xs leading-5 text-red-700">
+            {document.rejectionReason}
+          </p>
+        )}
+      </div>
+
+      <div className="min-w-[220px]">
+        <SenderDocumentReviewControls
+          senderId={
+            sender.id
+          }
+          documentId={
+            document.id
+          }
+          currentStatus={
+            document.status
+          }
+        />
+      </div>
+    </div>
+  ),
+)}
+    </div>
+  )}
+</section>
+
+<section className="rounded-2xl border border-slate-200 bg-white p-6">
+  <h2 className="text-lg font-semibold text-slate-950">
+    Audit history
+  </h2>
+
+  <p className="mt-1 text-sm text-slate-500">
+    Chronological record of registration, compliance, document, and provider-review activity.
+  </p>
+
+  {sender.auditEvents.length === 0 ? (
+    <p className="mt-6 text-sm text-slate-500">
+      No audit events recorded yet.
+    </p>
+  ) : (
+    <div className="mt-6 space-y-4">
+      {sender.auditEvents.map(
+        (event) => (
+          <div
+            key={event.id}
+            className="relative border-l-2 border-slate-200 pl-5"
+          >
+            <div className="absolute -left-[5px] top-1.5 h-2 w-2 rounded-full bg-slate-400" />
+
+            <div className="flex flex-col justify-between gap-2 sm:flex-row">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {event.action.replaceAll(
+                    "_",
+                    " ",
+                  )}
+                </p>
+
+                {event.fromStatus &&
+                  event.toStatus && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {event.fromStatus}
+                      {" → "}
+                      {event.toStatus}
+                    </p>
+                  )}
+
+                {event.documentType && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Document:{" "}
+                    {event.documentType}
+                  </p>
+                )}
+
+                {event.providerReference && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Provider reference:{" "}
+                    <span className="font-mono">
+                      {
+                        event.providerReference
+                      }
+                    </span>
+                  </p>
+                )}
+
+                {event.note && (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {event.note}
+                  </p>
+                )}
+
+                <p className="mt-2 text-xs text-slate-400">
+                  By{" "}
+                  {event.actorUser?.name ??
+                    event.actorUser
+                      ?.email ??
+                    "System"}
+                </p>
+              </div>
+
+              <p className="shrink-0 text-xs text-slate-400">
+                {formatDate(
+                  event.createdAt,
+                )}
               </p>
             </div>
-
-            <span className="text-xs font-semibold text-slate-600">
-              {document.status}
-            </span>
           </div>
         ),
       )}

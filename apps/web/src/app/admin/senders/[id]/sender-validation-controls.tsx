@@ -25,12 +25,15 @@ type Props = {
   currentProviderReference:
     | string
     | null;
+
+  documentsReady: boolean;
 };
 
 export function SenderValidationControls({
   senderId,
   currentStatus,
   currentProviderReference,
+  documentsReady,
 }: Props) {
   const router =
     useRouter();
@@ -261,19 +264,31 @@ export function SenderValidationControls({
             </button>
 
             <button
-              type="button"
-              disabled={
-                loading !== null
-              }
-              onClick={() =>
-                changeValidationStatus(
-                  "READY_FOR_PROVIDER",
-                )
-              }
-              className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              Ready for provider
-            </button>
+  type="button"
+  disabled={
+    loading !== null ||
+    !documentsReady
+  }
+  onClick={() =>
+    changeValidationStatus(
+      "READY_FOR_PROVIDER",
+    )
+  }
+  title={
+    documentsReady
+      ? undefined
+      : "All required documents must be accepted first"
+  }
+  className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+>
+  Ready for provider
+</button>
+
+{!documentsReady && (
+  <p className="basis-full text-xs text-amber-700">
+    Required compliance documents are still missing, pending review, or rejected.
+  </p>
+)}
 
             <button
               type="button"

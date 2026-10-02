@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -30,4 +31,9 @@ export class UpdateBusinessAccountDto {
   })
   @MaxLength(255)
   website?: string;
+
+@IsOptional()
+@IsString()
+@Matches(/^[A-Z]{3}$/)
+billingCurrency?: string;
 }

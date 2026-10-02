@@ -9,6 +9,10 @@ import {
   currencyForCountry,
 } from '../common/country-currency.js';
 
+import {
+  CreateSenderRegistrationPricingDto,
+} from './dto/create-sender-registration-pricing.dto.js';
+
 @Injectable()
 export class PricingService {
   constructor(private readonly prisma: PrismaService) {}
@@ -83,4 +87,74 @@ export class PricingService {
 
     return pricing;
   }
+
+  createSenderRegistrationPricing(
+  dto: CreateSenderRegistrationPricingDto,
+) {
+  return this.prisma.senderRegistrationPricing.create({
+    data: {
+      provider:
+        dto.provider
+          .trim()
+          .toLowerCase(),
+
+      countryCode:
+        dto.countryCode
+          .trim()
+          .toUpperCase(),
+
+      channel:
+        dto.channel,
+
+      senderType:
+        dto.senderType,
+
+      providerCost:
+        dto.providerCost,
+
+      providerCostCurrency:
+        dto.providerCostCurrency
+          .trim()
+          .toUpperCase(),
+
+      retailPrice:
+        dto.retailPrice,
+
+      currency:
+        dto.currency
+          .trim()
+          .toUpperCase(),
+
+      active:
+        true,
+    },
+  });
+}
+
+findSenderRegistrationPricing() {
+  return this.prisma.senderRegistrationPricing.findMany({
+    orderBy: [
+      {
+        countryCode:
+          'asc',
+      },
+      {
+        provider:
+          'asc',
+      },
+      {
+        channel:
+          'asc',
+      },
+      {
+        senderType:
+          'asc',
+      },
+      {
+        effectiveFrom:
+          'desc',
+      },
+    ],
+  });
+}
 }

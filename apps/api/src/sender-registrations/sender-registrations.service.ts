@@ -19,6 +19,7 @@ export class SenderRegistrationsService {
   async create(
     businessId: string,
     dto: CreateSenderRegistrationDto,
+    actorUserId: string,
   ) {
     const business =
       await this.prisma.business.findUnique({
@@ -37,66 +38,85 @@ export class SenderRegistrationsService {
       );
     }
 
-    return this.prisma.senderRegistration.create({
+    return this.prisma.$transaction(
+  async (tx) => {
+    const registration =
+      await tx.senderRegistration.create({
+        data: {
+          businessId,
+
+          channel:
+            dto.channel,
+
+          senderType:
+            dto.senderType,
+
+          senderValue:
+            dto.senderValue.trim(),
+
+          countryCode:
+            dto.countryCode
+              .trim()
+              .toUpperCase(),
+
+          destinationCountry:
+            dto.destinationCountry
+              ?.trim()
+              .toUpperCase(),
+
+          useCase:
+            dto.useCase?.trim(),
+
+          estimatedMonthlyVolume:
+            dto.estimatedMonthlyVolume,
+
+          provider:
+            'infobip',
+
+          status:
+            'DRAFT',
+        },
+
+        select: {
+          id: true,
+          channel: true,
+          senderType: true,
+          senderValue: true,
+          countryCode: true,
+          destinationCountry: true,
+          status: true,
+          useCase: true,
+          estimatedMonthlyVolume: true,
+          rejectionReason: true,
+          submittedAt: true,
+          approvedAt: true,
+          rejectedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+    await tx.senderAuditEvent.create({
       data: {
-        businessId,
+        senderRegistrationId:
+          registration.id,
 
-        channel:
-          dto.channel,
+        actorUserId,
 
-        senderType:
-          dto.senderType,
+        action:
+          'REGISTRATION_CREATED',
 
-        senderValue:
-          dto.senderValue.trim(),
-
-        countryCode:
-          dto.countryCode
-            .trim()
-            .toUpperCase(),
-
-        destinationCountry:
-          dto.destinationCountry
-            ?.trim()
-            .toUpperCase(),
-
-        useCase:
-          dto.useCase?.trim(),
-
-        estimatedMonthlyVolume:
-          dto.estimatedMonthlyVolume,
+        toStatus:
+          'DRAFT',
 
         provider:
           'infobip',
-
-        status:
-          'DRAFT',
-      },
-
-      select: {
-        id: true,
-        channel: true,
-        senderType: true,
-        senderValue: true,
-        countryCode: true,
-        destinationCountry: true,
-        status: true,
-
-        useCase: true,
-
-        estimatedMonthlyVolume:
-          true,
-
-        rejectionReason: true,
-
-        submittedAt: true,
-        approvedAt: true,
-        rejectedAt: true,
-
-        createdAt: true,
-        updatedAt: true,
       },
     });
+
+    return registration;
+  },
+);
   }
 
   findByBusiness(
@@ -141,51 +161,74 @@ export class SenderRegistrationsService {
   }
 
   async findOneForBusiness(
-    businessId: string,
-    id: string,
-  ) {
-    const registration =
-      await this.prisma.senderRegistration.findFirst({
-        where: {
-          id,
-          businessId,
+  businessId: string,
+  id: string,
+) {
+  const registration =
+    await this.prisma.senderRegistration.findFirst({
+      where: {
+        id,
+        businessId,
+      },
+
+      include: {
+        validations: {
+          orderBy: {
+            createdAt:
+              'desc',
+          },
         },
 
-        select: {
-          id: true,
-          channel: true,
-          senderType: true,
-          senderValue: true,
-
-          countryCode: true,
-          destinationCountry: true,
-
-          status: true,
-
-          useCase: true,
-
-          estimatedMonthlyVolume:
-            true,
-
-          rejectionReason: true,
-
-          submittedAt: true,
-          approvedAt: true,
-          rejectedAt: true,
-
-          createdAt: true,
-          updatedAt: true,
+        documents: {
+          orderBy: {
+            createdAt:
+              'desc',
+          },
         },
-      });
+      },
+    });
 
-    if (!registration) {
-      throw new NotFoundException(
-        'Sender registration not found',
-      );
-    }
-
-    return registration;
+  if (!registration) {
+    throw new NotFoundException(
+      'Sender registration not found',
+    );
   }
+
+  const requirements =
+    await this.prisma.senderRequirement.findMany({
+      where: {
+        active: true,
+
+        provider:
+          registration.provider,
+
+        countryCode:
+          registration.countryCode,
+
+        channel:
+          registration.channel,
+
+        senderType:
+          registration.senderType,
+      },
+
+      orderBy: [
+        {
+          required:
+            'desc',
+        },
+        {
+          key:
+            'asc',
+        },
+      ],
+    });
+
+  return {
+    ...registration,
+    requirements,
+  };
+}
 
   async findOne(
   id: string,
@@ -212,6 +255,22 @@ export class SenderRegistrationsService {
               'desc',
           },
         },
+
+        auditEvents: {
+  orderBy: {
+    createdAt: 'desc',
+  },
+
+  include: {
+    actorUser: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    },
+  },
+},
       },
     });
 
@@ -272,6 +331,7 @@ export class SenderRegistrationsService {
     providerReference?: string;
     rejectionReason?: string;
   },
+  actorUserId: string,
 ) {
   const registration =
     await this.findOne(id);
@@ -474,35 +534,208 @@ export class SenderRegistrationsService {
   async submitForReview(
   businessId: string,
   id: string,
+  actorUserId: string,
 ) {
-  const registration =
-    await this.prisma.senderRegistration.findFirst({
-      where: {
-        id,
-        businessId,
-      },
-    });
-
-  if (!registration) {
-    throw new NotFoundException(
-      'Sender registration not found',
-    );
-  }
-
-  if (
-    registration.status !==
-    'DRAFT'
-  ) {
-    throw new BadRequestException(
-      `Only DRAFT sender registrations can be submitted. Current status: ${registration.status}`,
-    );
-  }
-
   const submittedAt =
     new Date();
 
   return this.prisma.$transaction(
     async (tx) => {
+      const registration =
+        await tx.senderRegistration.findFirst({
+          where: {
+            id,
+            businessId,
+          },
+
+          include: {
+            business: {
+              include: {
+                wallet: true,
+              },
+            },
+          },
+        });
+
+      if (!registration) {
+        throw new NotFoundException(
+          'Sender registration not found',
+        );
+      }
+
+      if (
+        registration.status !==
+        'DRAFT'
+      ) {
+        throw new BadRequestException(
+          `Only DRAFT sender registrations can be submitted. Current status: ${registration.status}`,
+        );
+      }
+
+      let wallet =
+        registration.business.wallet;
+
+      if (!wallet) {
+        wallet =
+          await tx.wallet.create({
+            data: {
+              businessId,
+
+              currency:
+                registration.business
+                  .billingCurrency,
+
+              balance: 0,
+            },
+          });
+      }
+
+      const pricing =
+        await tx.senderRegistrationPricing.findFirst({
+          where: {
+            provider:
+              registration.provider,
+
+            countryCode:
+              registration.countryCode,
+
+            channel:
+              registration.channel,
+
+            senderType:
+              registration.senderType,
+
+            currency:
+              wallet.currency,
+
+            active:
+              true,
+
+            effectiveFrom: {
+              lte:
+                submittedAt,
+            },
+
+            OR: [
+              {
+                effectiveTo:
+                  null,
+              },
+              {
+                effectiveTo: {
+                  gt:
+                    submittedAt,
+                },
+              },
+            ],
+          },
+
+          orderBy: {
+            effectiveFrom:
+              'desc',
+          },
+        });
+
+      if (!pricing) {
+        throw new BadRequestException(
+          `Sender registration pricing is not configured for ${registration.provider}/${registration.countryCode}/${registration.channel}/${registration.senderType} in ${wallet.currency}.`,
+        );
+      }
+
+      const existingFee =
+        await tx.walletTransaction.findUnique({
+          where: {
+            senderRegistrationId_type: {
+              senderRegistrationId:
+                id,
+
+              type:
+                'SENDER_REGISTRATION_FEE',
+            },
+          },
+        });
+
+      if (!existingFee) {
+        const balanceBefore =
+          wallet.balance;
+
+        const fee =
+          pricing.retailPrice;
+
+        const debit =
+          await tx.wallet.updateMany({
+            where: {
+              id:
+                wallet.id,
+
+              balance: {
+                gte:
+                  fee,
+              },
+            },
+
+            data: {
+              balance: {
+                decrement:
+                  fee,
+              },
+            },
+          });
+
+        if (
+          debit.count !==
+          1
+        ) {
+          throw new BadRequestException(
+            `Insufficient wallet balance. Sender registration requires ${wallet.currency} ${fee.toString()}.`,
+          );
+        }
+
+        const updatedWallet =
+          await tx.wallet.findUniqueOrThrow({
+            where: {
+              id:
+                wallet.id,
+            },
+          });
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId:
+              wallet.id,
+
+            senderRegistrationId:
+              id,
+
+            performedByUserId:
+              actorUserId,
+
+            type:
+              'SENDER_REGISTRATION_FEE',
+
+            status:
+              'COMPLETED',
+
+            amount:
+              fee.negated(),
+
+            currency:
+              wallet.currency,
+
+            balanceBefore,
+
+            balanceAfter:
+              updatedWallet.balance,
+
+            reference:
+              `sender-registration:${id}`,
+
+            description:
+              `Sender registration fee for ${registration.senderValue}`,
+          },
+        });
+      }
+
       const updated =
         await tx.senderRegistration.update({
           where: {
@@ -558,10 +791,33 @@ export class SenderRegistrationsService {
         },
       });
 
+      await tx.senderAuditEvent.create({
+        data: {
+          senderRegistrationId:
+            id,
+
+          actorUserId,
+
+          action:
+            'REGISTRATION_SUBMITTED',
+
+          fromStatus:
+            'DRAFT',
+
+          toStatus:
+            'SUBMITTED',
+
+          provider:
+            registration.provider,
+        },
+      });
+
       return updated;
     },
   );
 }
+
+
 
 async updateValidationStatus(
   senderRegistrationId: string,
@@ -581,6 +837,7 @@ async updateValidationStatus(
     providerReference?: string;
     reviewNotes?: string;
   },
+  actorUserId: string,
 ) {
   const validation =
     await this.prisma.senderValidation.findFirst({
@@ -602,6 +859,114 @@ async updateValidationStatus(
 
   const status =
     dto.status;
+
+  const auditActionByStatus = {
+  INTERNAL_REVIEW:
+    validation.status ===
+    'DOCUMENTS_REQUIRED'
+      ? 'REVIEW_RESUMED'
+      : 'VALIDATION_STARTED',
+
+  DOCUMENTS_REQUIRED:
+    'DOCUMENTS_REQUESTED',
+
+  READY_FOR_PROVIDER:
+    'READY_FOR_PROVIDER',
+
+  PROVIDER_SUBMITTED:
+    'PROVIDER_SUBMITTED',
+
+  PROVIDER_PENDING:
+    'PROVIDER_PENDING',
+
+  APPROVED:
+    validation.status ===
+    'SUSPENDED'
+      ? 'RESTORED'
+      : 'APPROVED',
+
+  REJECTED:
+    'REJECTED',
+
+  SUSPENDED:
+    'SUSPENDED',
+
+  PENDING:
+    'VALIDATION_STARTED',
+} as const;  
+
+  if (
+  status ===
+  'READY_FOR_PROVIDER'
+) {
+  const requirements =
+    await this.prisma.senderRequirement.findMany({
+      where: {
+        active: true,
+
+        provider:
+          validation.provider,
+
+        countryCode:
+          validation.countryCode,
+
+        documentType: {
+          not: null,
+        },
+
+        required: true,
+      },
+
+      select: {
+        documentType: true,
+        name: true,
+      },
+    });
+
+  const documents =
+    await this.prisma.senderDocument.findMany({
+      where: {
+        senderRegistrationId,
+        status:
+          'ACCEPTED',
+      },
+
+      select: {
+        documentType: true,
+      },
+    });
+
+  const acceptedDocumentTypes =
+    new Set(
+      documents.map(
+        (document) =>
+          document.documentType,
+      ),
+    );
+
+  const missingRequirements =
+    requirements.filter(
+      (requirement) =>
+        requirement.documentType &&
+        !acceptedDocumentTypes.has(
+          requirement.documentType,
+        ),
+    );
+
+  if (
+    missingRequirements.length >
+    0
+  ) {
+    throw new BadRequestException(
+      `Required documents are missing or not accepted: ${missingRequirements
+        .map(
+          (requirement) =>
+            requirement.name,
+        )
+        .join(', ')}`,
+    );
+  }
+}  
 
   const allowedTransitions: Record<
     typeof validation.status,
@@ -679,35 +1044,38 @@ async updateValidationStatus(
           },
 
           data: {
-            status,
+  status,
 
-            providerReference:
-              dto.providerReference
-                ?.trim() ||
-              undefined,
+  reviewerUserId:
+    actorUserId,
 
-            reviewNotes:
-              dto.reviewNotes
-                ?.trim() ||
-              undefined,
+  providerReference:
+    dto.providerReference
+      ?.trim() ||
+    undefined,
 
-            submittedToProviderAt:
-              status ===
-              'PROVIDER_SUBMITTED'
-                ? now
-                : undefined,
+  reviewNotes:
+    dto.reviewNotes
+      ?.trim() ||
+    undefined,
 
-            completedAt:
-              status ===
-                'APPROVED' ||
-              status ===
-                'REJECTED'
-                ? now
-                : status ===
-                    'INTERNAL_REVIEW'
-                  ? null
-                  : undefined,
-          },
+  submittedToProviderAt:
+    status ===
+      'PROVIDER_SUBMITTED'
+      ? now
+      : undefined,
+
+  completedAt:
+    status ===
+      'APPROVED' ||
+    status ===
+      'REJECTED'
+      ? now
+      : status ===
+          'INTERNAL_REVIEW'
+        ? null
+        : undefined,
+},
         });
 
       if (
@@ -780,6 +1148,39 @@ async updateValidationStatus(
         });
       }
 
+      await tx.senderAuditEvent.create({
+  data: {
+    senderRegistrationId,
+
+    actorUserId,
+
+    action:
+      auditActionByStatus[
+        status
+      ],
+
+    fromStatus:
+      validation.status,
+
+    toStatus:
+      status,
+
+    provider:
+      validation.provider,
+
+    providerReference:
+      dto.providerReference
+        ?.trim() ||
+      validation.providerReference ||
+      undefined,
+
+    note:
+      dto.reviewNotes
+        ?.trim() ||
+      undefined,
+  },
+});
+
       return updatedValidation;
     },
   );
@@ -793,42 +1194,56 @@ async addDocument(
     fileName: string;
     fileUrl: string;
   },
+  actorUserId: string,
 ) {
-  const registration =
-    await this.prisma.senderRegistration.findUnique({
-      where: {
-        id:
-          senderRegistrationId,
-      },
+  const documentType =
+    await this.assertValidDocumentType(
+      senderRegistrationId,
+      dto.documentType,
+    );
 
-      select: {
-        id: true,
+  await this.assertDocumentUploadAllowed(
+  senderRegistrationId,
+  documentType,
+);  
+
+  return this.prisma.$transaction(
+  async (tx) => {
+    const document =
+      await tx.senderDocument.create({
+        data: {
+          senderRegistrationId,
+          documentType,
+          fileName:
+            dto.fileName.trim(),
+          fileUrl:
+            dto.fileUrl.trim(),
+          status:
+            'PENDING',
+        },
+      });
+
+    await tx.senderAuditEvent.create({
+      data: {
+        senderRegistrationId,
+        actorUserId,
+
+        action:
+          'DOCUMENT_UPLOADED',
+
+        documentId:
+          document.id,
+
+        documentType,
+
+        toStatus:
+          'PENDING',
       },
     });
 
-  if (!registration) {
-    throw new NotFoundException(
-      'Sender registration not found',
-    );
-  }
-
-  return this.prisma.senderDocument.create({
-    data: {
-      senderRegistrationId,
-
-      documentType:
-        dto.documentType.trim(),
-
-      fileName:
-        dto.fileName.trim(),
-
-      fileUrl:
-        dto.fileUrl.trim(),
-
-      status:
-        'PENDING',
-    },
-  });
+    return document;
+  },
+);
 }
 
 async updateDocumentStatus(
@@ -843,6 +1258,7 @@ async updateDocumentStatus(
 
     rejectionReason?: string;
   },
+  actorUserId: string,
 ) {
   const document =
     await this.prisma.senderDocument.findFirst({
@@ -871,23 +1287,279 @@ async updateDocumentStatus(
     );
   }
 
-  return this.prisma.senderDocument.update({
+  return this.prisma.$transaction(
+  async (tx) => {
+    const updated =
+      await tx.senderDocument.update({
+        where: {
+          id:
+            document.id,
+        },
+
+        data: {
+          status:
+            dto.status,
+
+          rejectionReason:
+            dto.status ===
+              'REJECTED'
+              ? dto.rejectionReason
+                  ?.trim()
+              : null,
+        },
+      });
+
+    await tx.senderAuditEvent.create({
+      data: {
+        senderRegistrationId,
+        actorUserId,
+
+        action:
+          dto.status ===
+            'ACCEPTED'
+            ? 'DOCUMENT_ACCEPTED'
+            : dto.status ===
+                'REJECTED'
+              ? 'DOCUMENT_REJECTED'
+              : 'DOCUMENT_UPLOADED',
+
+        documentId:
+          document.id,
+
+        documentType:
+          document.documentType,
+
+        fromStatus:
+          document.status,
+
+        toStatus:
+          dto.status,
+
+        note:
+          dto.status ===
+            'REJECTED'
+            ? dto.rejectionReason
+                ?.trim()
+            : undefined,
+      },
+    });
+
+    return updated;
+  },
+);
+}
+
+async addDocumentForBusiness(
+  businessId: string,
+  senderRegistrationId: string,
+
+  dto: {
+    documentType: string;
+    fileName: string;
+    fileUrl: string;
+  },
+  actorUserId: string,
+) {
+  const registration =
+    await this.prisma.senderRegistration.findFirst({
+      where: {
+        id: senderRegistrationId,
+        businessId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!registration) {
+    throw new NotFoundException(
+      'Sender registration not found',
+    );
+  }
+
+  const validation =
+  await this.prisma.senderValidation.findFirst({
     where: {
-      id:
-        document.id,
+      senderRegistrationId,
     },
 
-    data: {
-      status:
-        dto.status,
+    orderBy: {
+      createdAt:
+        'desc',
+    },
 
-      rejectionReason:
-        dto.status ===
-        'REJECTED'
-          ? dto.rejectionReason
-              ?.trim()
-          : null,
+    select: {
+      status: true,
     },
   });
+
+if (
+  !validation ||
+  validation.status !==
+    'DOCUMENTS_REQUIRED'
+) {
+  throw new BadRequestException(
+    'Documents can only be uploaded when additional compliance documents are required',
+  );
+}
+
+  const documentType =
+  await this.assertValidDocumentType(
+    senderRegistrationId,
+    dto.documentType,
+  );
+
+  await this.assertDocumentUploadAllowed(
+  senderRegistrationId,
+  documentType,
+);
+
+  return this.prisma.$transaction(
+  async (tx) => {
+    const document =
+      await tx.senderDocument.create({
+        data: {
+          senderRegistrationId,
+          documentType,
+          fileName:
+            dto.fileName.trim(),
+          fileUrl:
+            dto.fileUrl.trim(),
+          status:
+            'PENDING',
+        },
+      });
+
+    await tx.senderAuditEvent.create({
+      data: {
+        senderRegistrationId,
+        actorUserId,
+
+        action:
+          'DOCUMENT_UPLOADED',
+
+        documentId:
+          document.id,
+
+        documentType,
+
+        toStatus:
+          'PENDING',
+      },
+    });
+
+    return document;
+  },
+);
+}
+
+private async assertValidDocumentType(
+  senderRegistrationId: string,
+  documentType: string,
+) {
+  const registration =
+    await this.prisma.senderRegistration.findUnique({
+      where: {
+        id: senderRegistrationId,
+      },
+
+      select: {
+        id: true,
+        provider: true,
+        countryCode: true,
+        channel: true,
+        senderType: true,
+      },
+    });
+
+  if (!registration) {
+    throw new NotFoundException(
+      'Sender registration not found',
+    );
+  }
+
+  const normalizedDocumentType =
+    documentType.trim();
+
+  const requirement =
+    await this.prisma.senderRequirement.findFirst({
+      where: {
+        active: true,
+
+        provider:
+          registration.provider,
+
+        countryCode:
+          registration.countryCode,
+
+        channel:
+          registration.channel,
+
+        senderType:
+          registration.senderType,
+
+        documentType:
+          normalizedDocumentType,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!requirement) {
+    throw new BadRequestException(
+      'Document type is not valid for this sender registration',
+    );
+  }
+
+  return normalizedDocumentType;
+}
+
+private async assertDocumentUploadAllowed(
+  senderRegistrationId: string,
+  documentType: string,
+) {
+  const existing =
+    await this.prisma.senderDocument.findFirst({
+      where: {
+        senderRegistrationId,
+        documentType,
+
+        status: {
+          in: [
+            'PENDING',
+            'ACCEPTED',
+          ],
+        },
+      },
+
+      orderBy: {
+        createdAt:
+          'desc',
+      },
+
+      select: {
+        status: true,
+      },
+    });
+
+  if (!existing) {
+    return;
+  }
+
+  if (
+    existing.status ===
+    'ACCEPTED'
+  ) {
+    throw new BadRequestException(
+      'This document requirement has already been accepted',
+    );
+  }
+
+  throw new BadRequestException(
+    'A document of this type is already awaiting review',
+  );
 }
 }

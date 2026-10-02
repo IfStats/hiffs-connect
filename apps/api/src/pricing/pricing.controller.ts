@@ -13,6 +13,9 @@ import { Permission } from '../authz/permission.enum.js';
 import { RequirePermissions } from '../authz/require-permissions.decorator.js';
 
 import { CreatePricingDto } from './dto/create-pricing.dto.js';
+import {
+  CreateSenderRegistrationPricingDto,
+} from './dto/create-sender-registration-pricing.dto.js';
 import { PricingService } from './pricing.service.js';
 
 @Controller('pricing')
@@ -43,6 +46,27 @@ export class PricingController {
   findAll() {
     return this.pricingService.findAll();
   }
+
+  @Post('sender-registrations')
+@RequirePermissions(
+  Permission.PRICING_MANAGE,
+)
+createSenderRegistrationPricing(
+  @Body()
+  dto: CreateSenderRegistrationPricingDto,
+) {
+  return this.pricingService.createSenderRegistrationPricing(
+    dto,
+  );
+}
+
+@Get('sender-registrations')
+@RequirePermissions(
+  Permission.PRICING_READ,
+)
+findSenderRegistrationPricing() {
+  return this.pricingService.findSenderRegistrationPricing();
+}
 
   @Get(':id')
   @RequirePermissions(

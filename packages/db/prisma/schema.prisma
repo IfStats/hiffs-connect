@@ -47,13 +47,6 @@ enum BusinessRole {
   VIEWER
 }
 
-enum WalletTransactionType {
-  TOP_UP
-  MESSAGE_DEBIT
-  REFUND
-  ADJUSTMENT
-}
-
 enum WalletTransactionStatus {
   PENDING
   COMPLETED
@@ -124,6 +117,36 @@ enum SenderDocumentStatus {
   REJECTED
 }
 
+enum SenderAuditAction {
+  REGISTRATION_CREATED
+  REGISTRATION_SUBMITTED
+
+  VALIDATION_STARTED
+  DOCUMENTS_REQUESTED
+  REVIEW_RESUMED
+
+  DOCUMENT_UPLOADED
+  DOCUMENT_ACCEPTED
+  DOCUMENT_REJECTED
+
+  READY_FOR_PROVIDER
+  PROVIDER_SUBMITTED
+  PROVIDER_PENDING
+
+  APPROVED
+  REJECTED
+  SUSPENDED
+  RESTORED
+}
+
+enum WalletTransactionType {
+  TOP_UP
+  MESSAGE_DEBIT
+  SENDER_REGISTRATION_FEE
+  REFUND
+  ADJUSTMENT
+}
+
 model Business {
   id              String @id @default(cuid())
   name            String
@@ -158,8 +181,11 @@ model SenderRegistration {
   businessId String
   business   Business @relation(fields: [businessId], references: [id])
 
-  validations SenderValidation[]
-  documents   SenderDocument[]
+  validations        SenderValidation[]
+  documents          SenderDocument[]
+  walletTransactions WalletTransaction[]
+
+  auditEvents SenderAuditEvent[]
 
   channel     MessageChannel
   senderType  SenderType
@@ -277,6 +303,38 @@ model SenderDocument {
   @@index([senderRegistrationId])
   @@index([documentType])
   @@index([status])
+}
+
+model SenderAuditEvent {
+  id String @id @default(cuid())
+
+  senderRegistrationId String
+  senderRegistration   SenderRegistration @relation(fields: [senderRegistrationId], references: [id], onDelete: Cascade)
+
+  actorUserId String?
+  actorUser   User?   @relation("SenderAuditActor", fields: [actorUserId], references: [id])
+
+  action SenderAuditAction
+
+  fromStatus String?
+  toStatus   String?
+
+  documentId   String?
+  documentType String?
+
+  provider          String?
+  providerReference String?
+
+  note     String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([senderRegistrationId])
+  @@index([actorUserId])
+  @@index([action])
+  @@index([documentId])
+  @@index([createdAt])
 }
 
 model CountryPricing {
@@ -490,6 +548,9 @@ model WalletTransaction {
   messageId String?
   message   Message? @relation(fields: [messageId], references: [id])
 
+  senderRegistrationId String?
+  senderRegistration   SenderRegistration? @relation(fields: [senderRegistrationId], references: [id])
+
   performedByUserId String?
   performedByUser   User?   @relation("WalletTransactionPerformedBy", fields: [performedByUserId], references: [id])
 
@@ -507,12 +568,14 @@ model WalletTransaction {
 
   createdAt DateTime @default(now())
 
+  @@unique([senderRegistrationId, type])
   @@index([walletId])
   @@index([messageId])
   @@index([performedByUserId])
   @@index([type])
   @@index([status])
   @@index([createdAt])
+  @@index([senderRegistrationId])
 }
 
 model ApiKey {
@@ -637,6 +700,7 @@ model User {
   invitationsSent             BusinessInvitation[]     @relation("BusinessInvitationInvitedBy")
   invitationsAccepted         BusinessInvitation[]     @relation("BusinessInvitationAcceptedBy")
   senderValidationsReviewed   SenderValidation[]       @relation("SenderValidationReviewer")
+  senderAuditEvents           SenderAuditEvent[]       @relation("SenderAuditActor")
   emailVerificationTokens     EmailVerificationToken[]
   phoneVerifications          PhoneVerification[]
   refreshSessions             AuthRefreshSession[]
@@ -859,4 +923,35 @@ model SmsUnitTransaction {
   @@index([type])
   @@index([status])
   @@index([createdAt])
+}
+
+model SenderRegistrationPricing {
+  id String @id @default(cuid())
+
+  provider    String
+  countryCode String
+
+  channel    MessageChannel
+  senderType SenderType
+
+  providerCost         Decimal @db.Decimal(12, 6)
+  providerCostCurrency String  @db.VarChar(3)
+
+  retailPrice Decimal @db.Decimal(12, 6)
+  currency    String  @db.VarChar(3)
+
+  active Boolean @default(true)
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, countryCode, channel, senderType, currency, effectiveFrom])
+  @@index([provider])
+  @@index([countryCode])
+  @@index([channel])
+  @@index([senderType])
+  @@index([active])
 }

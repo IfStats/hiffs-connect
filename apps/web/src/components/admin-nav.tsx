@@ -20,6 +20,10 @@ const items = [
     label: 'Sender IDs',
     href: '/admin/senders',
   },
+  {
+    label: 'Pricing',
+    href: '/admin/pricing',
+  },
 ];
 
 export function AdminNav() {

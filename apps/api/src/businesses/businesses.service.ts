@@ -29,6 +29,7 @@ export class BusinessesService {
         id: true,
         name: true,
         countryCode: true,
+        billingCurrency: true,
         email: true,
         phone: true,
         website: true,
@@ -69,33 +70,115 @@ export class BusinessesService {
       },
 
       select: {
-        id: true,
+  id: true,
+  billingCurrency: true,
+
+  wallet: {
+    select: {
+      id: true,
+      currency: true,
+      balance: true,
+
+      _count: {
+        select: {
+          transactions: true,
+          smsUnitTransactions: true,
+        },
       },
+    },
+  },
+},
     });
 
     if (!business) {
       throw new NotFoundException('Business not found');
     }
 
-    return this.prisma.business.update({
+    const requestedBillingCurrency =
+  dto.billingCurrency
+    ?.trim()
+    .toUpperCase();
+
+if (
+  requestedBillingCurrency &&
+  requestedBillingCurrency !==
+    business.billingCurrency
+) {
+  const wallet =
+    business.wallet;
+
+  if (wallet) {
+    const walletUsed =
+      !wallet.balance.isZero() ||
+      wallet._count.transactions >
+        0 ||
+      wallet._count
+        .smsUnitTransactions >
+        0;
+
+    if (
+      walletUsed &&
+      wallet.currency !==
+        requestedBillingCurrency
+    ) {
+      throw new BadRequestException(
+        `Billing currency cannot be changed from ${business.billingCurrency} to ${requestedBillingCurrency} while the existing wallet is active in ${wallet.currency}.`,
+      );
+    }
+  }
+}
+
+    return this.prisma.$transaction(
+  async (tx) => {
+    if (
+      requestedBillingCurrency &&
+      business.wallet &&
+      business.wallet.currency !==
+        requestedBillingCurrency
+    ) {
+      await tx.wallet.update({
+        where: {
+          id:
+            business.wallet.id,
+        },
+
+        data: {
+          currency:
+            requestedBillingCurrency,
+        },
+      });
+    }
+
+    return tx.business.update({
       where: {
-        id: businessId,
+        id:
+          businessId,
       },
 
       data: {
-        name: dto.name?.trim(),
+        name:
+          dto.name?.trim(),
 
-        email: dto.email?.trim().toLowerCase(),
+        email:
+          dto.email
+            ?.trim()
+            .toLowerCase(),
 
-        phone: dto.phone?.trim(),
+        phone:
+          dto.phone?.trim(),
 
-        website: dto.website?.trim(),
+        website:
+          dto.website?.trim(),
+
+        billingCurrency:
+          requestedBillingCurrency,
       },
 
       select: {
         id: true,
         name: true,
         countryCode: true,
+        billingCurrency: true,
         email: true,
         phone: true,
         website: true,
@@ -103,6 +186,8 @@ export class BusinessesService {
         updatedAt: true,
       },
     });
+  },
+);
   }
 
   async getMembers(businessId: string) {

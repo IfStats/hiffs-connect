@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 
@@ -14,6 +15,19 @@ import { BusinessPermissionGuard } from '../authz/business-permission.guard.js';
 import { PlatformPermissionGuard } from '../authz/platform-permission.guard.js';
 import { Permission } from '../authz/permission.enum.js';
 import { RequirePermissions } from '../authz/require-permissions.decorator.js';
+
+import type {
+  Request,
+} from 'express';
+
+import type {
+  AuthUser,
+} from '../auth/auth-user.type.js';
+
+type AuthenticatedRequest =
+  Request & {
+    user?: AuthUser;
+  };
 
 import { CreateSenderRegistrationDto } from './dto/create-sender-registration.dto.js';
 import { UpdateSenderStatusDto } from './dto/update-sender-status.dto.js';
@@ -47,17 +61,21 @@ export class SenderRegistrationsController {
     Permission.SENDER_MANAGE,
   )
   create(
-    @Param('businessId')
-    businessId: string,
+  @Param('businessId')
+  businessId: string,
 
-    @Body()
-    dto: CreateSenderRegistrationDto,
-  ) {
-    return this.senderRegistrationsService.create(
-      businessId,
-      dto,
-    );
-  }
+  @Body()
+  dto: CreateSenderRegistrationDto,
+
+  @Req()
+  request: AuthenticatedRequest,
+) {
+  return this.senderRegistrationsService.create(
+    businessId,
+    dto,
+    request.user!.id,
+  );
+}
 
   @Get('business/:businessId')
   @UseGuards(
@@ -113,10 +131,14 @@ submitForReview(
 
   @Param('id')
   id: string,
+
+  @Req()
+  request: AuthenticatedRequest,
 ) {
   return this.senderRegistrationsService.submitForReview(
     businessId,
     id,
+    request.user!.id,
   );
 }
 
@@ -157,10 +179,45 @@ updateValidationStatus(
 
   @Body()
   dto: UpdateSenderValidationStatusDto,
+
+  @Req()
+  request: AuthenticatedRequest,
 ) {
   return this.senderRegistrationsService.updateValidationStatus(
     id,
     dto,
+    request.user!.id,
+  );
+}
+
+@Post(
+  'business/:businessId/:id/documents',
+)
+@UseGuards(
+  ApiAuthGuard,
+  BusinessPermissionGuard,
+)
+@RequirePermissions(
+  Permission.SENDER_MANAGE,
+)
+addDocumentForBusiness(
+  @Param('businessId')
+  businessId: string,
+
+  @Param('id')
+  id: string,
+
+  @Body()
+  dto: CreateSenderDocumentDto,
+
+  @Req()
+  request: AuthenticatedRequest,
+) {
+  return this.senderRegistrationsService.addDocumentForBusiness(
+    businessId,
+    id,
+    dto,
+    request.user!.id,
   );
 }
 
@@ -178,10 +235,14 @@ addDocument(
 
   @Body()
   dto: CreateSenderDocumentDto,
+
+  @Req()
+  request: AuthenticatedRequest,
 ) {
   return this.senderRegistrationsService.addDocument(
     id,
     dto,
+    request.user!.id,
   );
 }
 
@@ -202,11 +263,15 @@ updateDocumentStatus(
 
   @Body()
   dto: UpdateSenderDocumentStatusDto,
+
+  @Req()
+  request: AuthenticatedRequest,
 ) {
   return this.senderRegistrationsService.updateDocumentStatus(
     id,
     documentId,
     dto,
+    request.user!.id,
   );
 }
 
@@ -236,15 +301,19 @@ findOne(
     Permission.SENDER_APPROVE,
   )
   updateStatus(
-    @Param('id')
-    id: string,
+  @Param('id')
+  id: string,
 
-    @Body()
-    dto: UpdateSenderStatusDto,
-  ) {
-    return this.senderRegistrationsService.updateStatus(
-      id,
-      dto,
-    );
-  }
+  @Body()
+  dto: UpdateSenderStatusDto,
+
+  @Req()
+  request: AuthenticatedRequest,
+) {
+  return this.senderRegistrationsService.updateStatus(
+    id,
+    dto,
+    request.user!.id,
+  );
+}
 }
