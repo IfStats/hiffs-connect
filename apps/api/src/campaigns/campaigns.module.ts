@@ -3,6 +3,10 @@ import {
 } from '@nestjs/common';
 
 import {
+  AuthModule,
+} from '../auth/auth.module.js';
+
+import {
   CampaignsController,
 } from './campaigns.controller.js';
 
@@ -11,6 +15,10 @@ import {
 } from './campaigns.service.js';
 
 @Module({
+  imports: [
+    AuthModule,
+  ],
+
   controllers: [
     CampaignsController,
   ],
