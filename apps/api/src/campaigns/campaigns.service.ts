@@ -1,4 +1,14 @@
 import {
+  Prisma,
+  SmsUnitTransactionType,
+  WalletTransactionStatus,
+} from '@prisma/client';
+
+import {
+  calculateSmsUsage,
+} from '../messaging/sms-usage.js';
+
+import {
   BadRequestException,
   Injectable,
   NotFoundException,
@@ -329,5 +339,381 @@ for (
         ),
     },
   };
+}
+
+async launch(
+  businessId: string,
+  campaignId: string,
+) {
+  const campaign =
+    await this.prisma.campaign.findFirst({
+      where: {
+        id: campaignId,
+        businessId,
+      },
+
+      include: {
+        senderRegistration: {
+          select: {
+            id: true,
+            status: true,
+            channel: true,
+          },
+        },
+      },
+    });
+
+  if (!campaign) {
+    throw new NotFoundException(
+      'Campaign not found',
+    );
+  }
+
+  if (
+    campaign.status ===
+      'QUEUED' ||
+    campaign.status ===
+      'PROCESSING' ||
+    campaign.status ===
+      'COMPLETED'
+  ) {
+    return campaign;
+  }
+
+  if (
+    campaign.status ===
+      'FAILED' ||
+    campaign.status ===
+      'CANCELLED' ||
+    campaign.status ===
+      'PARTIALLY_FAILED'
+  ) {
+    throw new BadRequestException(
+      `Campaign cannot be launched from status ${campaign.status}`,
+    );
+  }
+
+  if (
+    campaign.senderRegistration
+      .status !==
+      'APPROVED' ||
+    campaign.senderRegistration
+      .channel !==
+      'SMS'
+  ) {
+    throw new BadRequestException(
+      'Campaign sender is not approved for SMS',
+    );
+  }
+
+  if (
+    campaign.scheduledAt &&
+    campaign.scheduledAt.getTime() >
+      Date.now()
+  ) {
+    throw new BadRequestException(
+      'Future scheduled campaigns cannot be launched until their scheduled time',
+    );
+  }
+
+  const content =
+    campaign.content.trim();
+
+  if (!content) {
+    throw new BadRequestException(
+      'Campaign message is empty',
+    );
+  }
+
+  const smsUsage =
+    calculateSmsUsage(
+      content,
+    );
+
+  const recipientCount =
+    await this.prisma.campaignRecipient.count({
+      where: {
+        campaignId:
+          campaign.id,
+
+        status:
+          'PENDING',
+      },
+    });
+
+  if (
+    recipientCount ===
+    0
+  ) {
+    throw new BadRequestException(
+      'Campaign has no pending recipients',
+    );
+  }
+
+  const requiredSmsUnits =
+    smsUsage.segmentCount *
+    recipientCount;
+
+  try {
+    const result =
+      await this.prisma.$transaction(
+        async (tx) => {
+          const existingReservation =
+            await tx.smsUnitTransaction.findFirst({
+              where: {
+                campaignId:
+                  campaign.id,
+
+                type:
+                  SmsUnitTransactionType.CAMPAIGN_RESERVATION,
+              },
+            });
+
+          if (
+            existingReservation
+          ) {
+            const existingCampaign =
+              await tx.campaign.findUniqueOrThrow({
+                where: {
+                  id:
+                    campaign.id,
+                },
+
+                include: {
+                  senderRegistration: {
+                    select: {
+                      id: true,
+                      senderValue: true,
+                    },
+                  },
+                },
+              });
+
+            return {
+              campaign:
+                existingCampaign,
+
+              reservation:
+                existingReservation,
+
+              smsPagesPerRecipient:
+                smsUsage.segmentCount,
+
+              requiredSmsUnits:
+                Math.abs(
+                  existingReservation.units,
+                ),
+            };
+          }
+
+          const wallet =
+            await tx.wallet.findUnique({
+              where: {
+                businessId,
+              },
+            });
+
+          if (!wallet) {
+            throw new BadRequestException(
+              'Business wallet not found',
+            );
+          }
+
+          const debitResult =
+            await tx.wallet.updateMany({
+              where: {
+                id:
+                  wallet.id,
+
+                smsUnits: {
+                  gte:
+                    requiredSmsUnits,
+                },
+              },
+
+              data: {
+                smsUnits: {
+                  decrement:
+                    requiredSmsUnits,
+                },
+              },
+            });
+
+          if (
+            debitResult.count !==
+            1
+          ) {
+            throw new BadRequestException(
+              `Insufficient SMS units. Campaign requires ${requiredSmsUnits} units.`,
+            );
+          }
+
+          const updatedWallet =
+            await tx.wallet.findUniqueOrThrow({
+              where: {
+                id:
+                  wallet.id,
+              },
+            });
+
+          const balanceAfter =
+            updatedWallet.smsUnits;
+
+          const balanceBefore =
+            balanceAfter +
+            requiredSmsUnits;
+
+          const reservation =
+            await tx.smsUnitTransaction.create({
+              data: {
+                walletId:
+                  wallet.id,
+
+                campaignId:
+                  campaign.id,
+
+                type:
+                  SmsUnitTransactionType.CAMPAIGN_RESERVATION,
+
+                status:
+                  WalletTransactionStatus.COMPLETED,
+
+                units:
+                  -requiredSmsUnits,
+
+                balanceBefore,
+
+                balanceAfter,
+
+                reference:
+                  `campaign-${campaign.id}`,
+
+                description:
+                  `SMS units reserved for campaign ${campaign.name}`,
+              },
+            });
+
+          const queuedAt =
+            new Date();
+
+          const queuedRecipients =
+            await tx.campaignRecipient.updateMany({
+              where: {
+                campaignId:
+                  campaign.id,
+
+                status:
+                  'PENDING',
+              },
+
+              data: {
+                status:
+                  'QUEUED',
+
+                queuedAt,
+              },
+            });
+
+          const updatedCampaign =
+            await tx.campaign.update({
+              where: {
+                id:
+                  campaign.id,
+              },
+
+              data: {
+                status:
+                  'QUEUED',
+
+                queuedCount:
+                  queuedRecipients.count,
+              },
+
+              include: {
+                senderRegistration: {
+                  select: {
+                    id: true,
+                    senderValue: true,
+                  },
+                },
+              },
+            });
+
+          return {
+            campaign:
+              updatedCampaign,
+
+            reservation,
+
+            smsPagesPerRecipient:
+              smsUsage.segmentCount,
+
+            requiredSmsUnits,
+          };
+        },
+      );
+
+    return result;
+  } catch (error) {
+    /*
+     * Concurrent launch requests may race.
+     * The unique (campaignId, type)
+     * constraint guarantees only one
+     * reservation survives.
+     */
+    if (
+      error instanceof
+        Prisma.PrismaClientKnownRequestError &&
+      error.code ===
+        'P2002'
+    ) {
+      const reservation =
+        await this.prisma.smsUnitTransaction.findFirst({
+          where: {
+            campaignId:
+              campaign.id,
+
+            type:
+              SmsUnitTransactionType.CAMPAIGN_RESERVATION,
+          },
+        });
+
+      const existingCampaign =
+        await this.prisma.campaign.findUniqueOrThrow({
+          where: {
+            id:
+              campaign.id,
+          },
+
+          include: {
+            senderRegistration: {
+              select: {
+                id: true,
+                senderValue: true,
+              },
+            },
+          },
+        });
+
+      return {
+        campaign:
+          existingCampaign,
+
+        reservation,
+
+        smsPagesPerRecipient:
+          smsUsage.segmentCount,
+
+        requiredSmsUnits:
+          reservation
+            ? Math.abs(
+                reservation.units,
+              )
+            : requiredSmsUnits,
+      };
+    }
+
+    throw error;
+  }
 }
 }

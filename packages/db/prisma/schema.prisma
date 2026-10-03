@@ -90,6 +90,7 @@ enum SmsUnitTransactionType {
   ADMIN_CREDIT
   ADMIN_DEBIT
   MESSAGE_DEBIT
+  CAMPAIGN_RESERVATION
   REFUND
   ADJUSTMENT
 }
@@ -166,6 +167,15 @@ enum CampaignRecipientStatus {
   DELIVERED
   FAILED
   SKIPPED
+}
+
+enum FxConversionStatus {
+  QUOTED
+  CONFIRMED
+  COMPLETED
+  EXPIRED
+  FAILED
+  CANCELLED
 }
 
 model Business {
@@ -560,8 +570,9 @@ model Wallet {
   transactions        WalletTransaction[]
   smsUnitTransactions SmsUnitTransaction[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  walletFxConversions WalletFxConversion[]
 }
 
 model WalletTransaction {
@@ -571,6 +582,8 @@ model WalletTransaction {
 
   messageId String?
   message   Message? @relation(fields: [messageId], references: [id])
+
+  fxConversions WalletFxConversion[]
 
   senderRegistrationId String?
   senderRegistration   SenderRegistration? @relation(fields: [senderRegistrationId], references: [id])
@@ -730,6 +743,8 @@ model User {
   refreshSessions             AuthRefreshSession[]
 
   smsUnitTransactionsPerformed SmsUnitTransaction[] @relation("SmsUnitTransactionPerformedBy")
+
+  fxConversionsPerformed WalletFxConversion[] @relation("WalletFxConversionPerformedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -925,6 +940,9 @@ model SmsUnitTransaction {
   messageId String?
   message   Message? @relation(fields: [messageId], references: [id])
 
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+
   performedByUserId String?
   performedByUser   User?   @relation("SmsUnitTransactionPerformedBy", fields: [performedByUserId], references: [id])
 
@@ -941,8 +959,10 @@ model SmsUnitTransaction {
 
   createdAt DateTime @default(now())
 
+  @@unique([campaignId, type])
   @@index([walletId])
   @@index([messageId])
+  @@index([campaignId])
   @@index([performedByUserId])
   @@index([type])
   @@index([status])
@@ -1015,6 +1035,8 @@ model Campaign {
 
   recipients CampaignRecipient[]
 
+  smsUnitTransactions SmsUnitTransaction[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1057,4 +1079,47 @@ model CampaignRecipient {
   @@index([status])
   @@index([recipient])
   @@index([createdAt])
+}
+
+model WalletFxConversion {
+  id String @id @default(cuid())
+
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id])
+
+  fromCurrency String @db.VarChar(3)
+  toCurrency   String @db.VarChar(3)
+
+  sourceAmount Decimal @db.Decimal(18, 6)
+  targetAmount Decimal @db.Decimal(18, 6)
+
+  marketRate  Decimal @db.Decimal(18, 8)
+  appliedRate Decimal @db.Decimal(18, 8)
+
+  feeAmount   Decimal? @db.Decimal(18, 6)
+  feeCurrency String?  @db.VarChar(3)
+
+  provider          String
+  providerReference String?
+
+  status FxConversionStatus @default(QUOTED)
+
+  expiresAt DateTime
+
+  performedByUserId String?
+  performedByUser   User?   @relation("WalletFxConversionPerformedBy", fields: [performedByUserId], references: [id])
+
+  confirmedAt DateTime?
+  completedAt DateTime?
+
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  walletTransaction   WalletTransaction? @relation(fields: [walletTransactionId], references: [id])
+  walletTransactionId String?
+
+  @@index([walletId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@index([performedByUserId])
 }

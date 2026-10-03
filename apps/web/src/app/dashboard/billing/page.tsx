@@ -10,6 +10,10 @@ import {
   authOptions,
 } from "@/auth";
 
+import {
+  LocalCurrencyNotice,
+} from "./local-currency-notice";
+
 type Wallet = {
   id: string;
   currency: string;
@@ -62,6 +66,7 @@ type SmsUnitTransaction = {
     | "ADMIN_CREDIT"
     | "ADMIN_DEBIT"
     | "MESSAGE_DEBIT"
+    | "CAMPAIGN_RESERVATION"
     | "REFUND"
     | "ADJUSTMENT";
 
@@ -275,6 +280,12 @@ export default async function BillingPage() {
         </article>
       </section>
 
+      <LocalCurrencyNotice
+  walletCurrency={
+    wallet.currency
+  }
+/>
+
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-6 py-5">
           <h2 className="font-semibold text-slate-950">
@@ -286,6 +297,7 @@ export default async function BillingPage() {
             refunds and adjustments.
           </p>
         </div>
+        
 
         {transactions.length ===
         0 ? (

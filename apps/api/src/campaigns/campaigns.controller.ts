@@ -102,6 +102,25 @@ findRecipients(
   );
 }
 
+@Post(
+  'business/:businessId/:id/launch',
+)
+@RequirePermissions(
+  Permission.MESSAGE_SEND_BULK,
+)
+launch(
+  @Param('businessId')
+  businessId: string,
+
+  @Param('id')
+  id: string,
+) {
+  return this.campaignsService.launch(
+    businessId,
+    id,
+  );
+}
+
   @Get('business/:businessId/:id')
   @RequirePermissions(
     Permission.MESSAGE_READ,

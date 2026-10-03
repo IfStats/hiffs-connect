@@ -15,6 +15,7 @@ export enum Permission {
   WALLET_READ = 'wallet.read',
   WALLET_TOPUP = 'wallet.topup',
   WALLET_TRANSACTION_READ = 'wallet.transaction.read',
+  WALLET_FX = 'wallet.fx',
   WALLET_ADMIN_CREDIT = 'wallet.admin_credit',
   WALLET_ADMIN_DEBIT = 'wallet.admin_debit',
   WALLET_ADMIN_REFUND = 'wallet.admin_refund',

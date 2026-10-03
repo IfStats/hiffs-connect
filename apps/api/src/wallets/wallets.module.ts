@@ -6,6 +6,9 @@ import { PrismaModule } from '../prisma.module.js';
 
 import { WalletsController } from './wallets.controller.js';
 import { WalletsService } from './wallets.service.js';
+import {
+  FxRateService,
+} from './fx-rate.service.js';
 
 @Module({
   imports: [
@@ -20,6 +23,7 @@ import { WalletsService } from './wallets.service.js';
 
   providers: [
     WalletsService,
+    FxRateService,
   ],
 
   exports: [

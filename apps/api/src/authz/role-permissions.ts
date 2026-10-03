@@ -16,6 +16,7 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
 
     Permission.TEMPLATE_READ,
     Permission.TEMPLATE_MANAGE,
+    
 
     Permission.MEMBER_READ,
     Permission.MEMBER_INVITE,
@@ -25,6 +26,8 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.WALLET_READ,
     Permission.WALLET_TOPUP,
     Permission.WALLET_TRANSACTION_READ,
+
+    Permission.WALLET_FX,
 
     Permission.MESSAGE_READ,
     Permission.MESSAGE_SEND,
@@ -112,8 +115,12 @@ export const BUSINESS_ROLE_PERMISSIONS: Record<
     Permission.WALLET_TOPUP,
     Permission.WALLET_TRANSACTION_READ,
 
+    Permission.WALLET_FX,
+
     Permission.PRICING_READ,
   ],
+
+  
 
   [BusinessRole.OPERATOR]: [
     Permission.BUSINESS_READ,
