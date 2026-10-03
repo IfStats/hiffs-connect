@@ -23,6 +23,33 @@ export class CampaignsService {
     businessId: string,
     dto: CreateCampaignDto,
   ) {
+
+    const clientRequestId =
+  dto.clientRequestId
+    .trim();
+
+const existingCampaign =
+  await this.prisma.campaign.findUnique({
+    where: {
+      businessId_clientRequestId: {
+        businessId,
+        clientRequestId,
+      },
+    },
+
+    include: {
+      senderRegistration: {
+        select: {
+          id: true,
+          senderValue: true,
+        },
+      },
+    },
+  });
+
+if (existingCampaign) {
+  return existingCampaign;
+}
     const sender =
       await this.prisma.senderRegistration.findFirst({
         where: {
@@ -98,6 +125,8 @@ export class CampaignsService {
             data: {
               businessId,
 
+              clientRequestId,
+
               senderRegistrationId:
                 sender.id,
 
@@ -119,36 +148,55 @@ export class CampaignsService {
             },
           });
 
-        await tx.campaignRecipient.createMany({
-          data:
-            recipients.map(
-              (recipient) => ({
-                campaignId:
-                  campaign.id,
+        const chunkSize =
+  1000;
 
-                recipient,
+for (
+  let index = 0;
+  index < recipients.length;
+  index += chunkSize
+) {
+  const chunk =
+    recipients.slice(
+      index,
+      index +
+        chunkSize,
+    );
 
-                status:
-                  'PENDING',
-              }),
-            ),
-        });
+  await tx.campaignRecipient.createMany({
+    data:
+      chunk.map(
+        (recipient) => ({
+          campaignId:
+            campaign.id,
+
+          recipient,
+
+          status:
+            'PENDING',
+        }),
+      ),
+
+    skipDuplicates:
+      true,
+  });
+}
 
         return tx.campaign.findUniqueOrThrow({
-          where: {
-            id:
-              campaign.id,
-          },
+  where: {
+    id:
+      campaign.id,
+  },
 
-          include: {
-            recipients: {
-              orderBy: {
-                createdAt:
-                  'asc',
-              },
-            },
-          },
-        });
+  include: {
+    senderRegistration: {
+      select: {
+        id: true,
+        senderValue: true,
+      },
+    },
+  },
+});
       },
     );
   }
@@ -189,20 +237,13 @@ export class CampaignsService {
         },
 
         include: {
-          senderRegistration: {
-            select: {
-              id: true,
-              senderValue: true,
-            },
-          },
-
-          recipients: {
-            orderBy: {
-              createdAt:
-                'asc',
-            },
-          },
-        },
+  senderRegistration: {
+    select: {
+      id: true,
+      senderValue: true,
+    },
+  },
+},
       });
 
     if (!campaign) {
@@ -213,4 +254,80 @@ export class CampaignsService {
 
     return campaign;
   }
+
+  async findRecipients(
+  businessId: string,
+  campaignId: string,
+  page: number,
+  limit: number,
+) {
+  const campaign =
+    await this.prisma.campaign.findFirst({
+      where: {
+        id:
+          campaignId,
+
+        businessId,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!campaign) {
+    throw new NotFoundException(
+      'Campaign not found',
+    );
+  }
+
+  const skip =
+    (page - 1) *
+    limit;
+
+  const [
+    recipients,
+    total,
+  ] =
+    await this.prisma.$transaction([
+      this.prisma.campaignRecipient.findMany({
+        where: {
+          campaignId,
+        },
+
+        orderBy: {
+          createdAt:
+            'asc',
+        },
+
+        skip,
+
+        take:
+          limit,
+      }),
+
+      this.prisma.campaignRecipient.count({
+        where: {
+          campaignId,
+        },
+      }),
+    ]);
+
+  return {
+    data:
+      recipients,
+
+    pagination: {
+      page,
+      limit,
+      total,
+
+      totalPages:
+        Math.ceil(
+          total /
+            limit,
+        ),
+    },
+  };
+}
 }

@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -30,6 +31,10 @@ import {
 import {
   CreateCampaignDto,
 } from './dto/create-campaign.dto.js';
+
+import {
+  CampaignRecipientsQueryDto,
+} from './dto/campaign-recipients-query.dto.js';
 
 @Controller('campaigns')
 @UseGuards(
@@ -71,6 +76,31 @@ export class CampaignsController {
       businessId,
     );
   }
+
+  @Get(
+  'business/:businessId/:id/recipients',
+)
+@RequirePermissions(
+  Permission.MESSAGE_READ,
+)
+findRecipients(
+  @Param('businessId')
+  businessId: string,
+
+  @Param('id')
+  id: string,
+
+  @Query()
+  query:
+    CampaignRecipientsQueryDto,
+) {
+  return this.campaignsService.findRecipients(
+    businessId,
+    id,
+    query.page,
+    query.limit,
+  );
+}
 
   @Get('business/:businessId/:id')
   @RequirePermissions(

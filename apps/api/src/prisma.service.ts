@@ -8,11 +8,15 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    const connectionString = process.env.DATABASE_URL;
+   const connectionString =
+  process.env.DATABASE_URL_UNPOOLED ??
+  process.env.DATABASE_URL;
 
     if (!connectionString) {
-      throw new Error('DATABASE_URL is not configured');
-    }
+  throw new Error(
+    'DATABASE_URL_UNPOOLED or DATABASE_URL is not configured',
+  );
+}
 
     const adapter = new PrismaPg({
       connectionString,

@@ -15,6 +15,11 @@ export class CreateCampaignDto {
   name!: string;
 
   @IsString()
+@IsNotEmpty()
+@MaxLength(128)
+clientRequestId!: string;
+
+  @IsString()
   @IsNotEmpty()
   senderRegistrationId!: string;
 
